@@ -1,0 +1,24 @@
+{
+  "name": "tg_showcase",
+  "private": true,
+  "packageManager": "pnpm@10.18.3",
+  "scripts": {
+    "dev:backend": "pnpm --filter @tg-showcase/backend dev",
+    "dev:bot": "pnpm --filter @tg-showcase/bot dev",
+    "dev:miniapp": "pnpm --filter @tg-showcase/miniapp dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm exec eslint .",
+    "format": "pnpm exec prettier --write ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.0.0",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.4.0",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.2"
+  }
+}
