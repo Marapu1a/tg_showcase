@@ -2,7 +2,7 @@ import { ProductStatus } from '@prisma/client';
 
 export type UpdateProductBody = {
   title?: string;
-  description?: string;
+  description?: string | null;
   priceText?: string;
   checkoutUrl?: string;
   status?: ProductStatus;
@@ -49,10 +49,13 @@ export function parseUpdateProductBody(body: unknown): UpdateProductBody {
   }
 
   if (payload.description !== undefined) {
-    if (!isNonEmptyString(payload.description)) {
-      throw new Error('description must be a non-empty string');
+    if (payload.description === null) {
+      data.description = null;
+    } else if (!isNonEmptyString(payload.description)) {
+      throw new Error('description must be a non-empty string or null');
+    } else {
+      data.description = payload.description.trim();
     }
-    data.description = payload.description.trim();
   }
 
   if (payload.priceText !== undefined) {
