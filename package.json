@@ -6,10 +6,8 @@
     "dev:backend": "pnpm --filter @tg-showcase/backend dev",
     "dev:bot": "pnpm --filter @tg-showcase/bot dev",
     "dev:miniapp": "pnpm --filter @tg-showcase/miniapp dev",
-    "dev:tunnel:miniapp": "\"%LOCALAPPDATA%\\\\cloudflared\\\\cloudflared.exe\" tunnel --url http://localhost:5173 --no-autoupdate --logfile \"%TEMP%\\\\cloudflared-miniapp.log\"",
-    "dev:tunnel:backend": "\"%LOCALAPPDATA%\\\\cloudflared\\\\cloudflared.exe\" tunnel --url http://localhost:3000 --no-autoupdate --logfile \"%TEMP%\\\\cloudflared-backend.log\"",
-    "dev:tunnel:miniapp:sync": "powershell -ExecutionPolicy Bypass -File scripts\\update-miniapp-tunnel.ps1",
-    "dev:tunnel:backend:sync": "powershell -ExecutionPolicy Bypass -File scripts\\update-backend-tunnel.ps1",
+    "dev:tunnel:miniapp": "powershell -ExecutionPolicy Bypass -Command \"& \\\"$env:LOCALAPPDATA\\cloudflared\\cloudflared.exe\\\" tunnel --url http://localhost:5173 --no-autoupdate\"",
+    "dev:tunnel:backend": "powershell -ExecutionPolicy Bypass -Command \"& \\\"$env:LOCALAPPDATA\\cloudflared\\cloudflared.exe\\\" tunnel --url http://localhost:3000 --no-autoupdate\"",
     "build": "pnpm -r build",
     "lint": "pnpm exec eslint .",
     "format": "pnpm exec prettier --write ."

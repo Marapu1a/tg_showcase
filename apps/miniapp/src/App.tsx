@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 
 import { AppLayout } from './components/AppLayout';
@@ -9,21 +8,7 @@ import { OfferDetailPage } from './pages/OfferDetailPage';
 import { OffersPage } from './pages/OffersPage';
 import { ProductsPage } from './pages/ProductsPage';
 
-declare global {
-  interface Window {
-    Telegram?: {
-      WebApp?: {
-        ready?: () => void;
-      };
-    };
-  }
-}
-
 export function App() {
-  useEffect(() => {
-    window.Telegram?.WebApp?.ready?.();
-  }, []);
-
   return (
     <Routes>
       <Route element={<AppLayout />}>

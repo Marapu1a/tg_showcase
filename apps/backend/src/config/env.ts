@@ -40,4 +40,5 @@ export const env = {
   BACKEND_PUBLIC_URL: getOptionalEnv('BACKEND_PUBLIC_URL'),
   MINI_APP_PUBLIC_URL: getOptionalEnv('MINI_APP_PUBLIC_URL'),
   DEFAULT_PUBLISH_CHANNEL_ID: getOptionalEnv('DEFAULT_PUBLISH_CHANNEL_ID'),
+  CORS_ORIGIN: getOptionalEnv('CORS_ORIGIN'),
 } as const;
