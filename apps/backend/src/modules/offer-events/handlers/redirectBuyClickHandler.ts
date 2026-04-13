@@ -1,22 +1,19 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { OfferEventType } from '@prisma/client';
 
-import { parseOfferEventBody } from '../schemas/offerEventBodySchema.js';
 import { parseOfferEventParams } from '../schemas/offerEventParamsSchema.js';
 import { recordOfferClick } from './recordOfferClick.js';
 
-export async function trackDetailClickHandler(
+export async function redirectBuyClickHandler(
   request: FastifyRequest,
   reply: FastifyReply,
 ) {
   try {
     const { offerId } = parseOfferEventParams(request.params);
-    const { viewerTelegramUserId } = parseOfferEventBody(request.body);
 
     const result = await recordOfferClick({
       offerId,
-      type: OfferEventType.DETAIL_CLICK,
-      viewerTelegramUserId,
+      type: OfferEventType.BUY_CLICK,
     });
 
     if (!result) {
@@ -25,10 +22,18 @@ export async function trackDetailClickHandler(
       });
     }
 
-    return reply.code(201).send(result.event);
+    const checkoutUrl = result.offer.product.checkoutUrl;
+
+    if (!checkoutUrl) {
+      return reply.code(400).send({
+        message: 'Checkout URL is missing',
+      });
+    }
+
+    return reply.redirect(checkoutUrl, 302);
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : 'Failed to track DETAIL click';
+      error instanceof Error ? error.message : 'Failed to redirect BUY click';
 
     return reply.code(400).send({
       message,

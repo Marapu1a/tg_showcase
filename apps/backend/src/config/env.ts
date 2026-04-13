@@ -12,6 +12,13 @@ function getRequiredEnv(name: string): string {
   return value;
 }
 
+function getOptionalEnv(name: string): string | undefined {
+  const value = process.env[name];
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
 function getNodeEnv(): 'development' | 'production' | 'test' {
   const value = process.env.NODE_ENV;
 
@@ -29,4 +36,8 @@ export const env = {
   PORT: Number(process.env.PORT ?? 3000),
   DATABASE_URL: getRequiredEnv('DATABASE_URL'),
   NODE_ENV: getNodeEnv(),
+  TELEGRAM_BOT_TOKEN: getOptionalEnv('TELEGRAM_BOT_TOKEN'),
+  BACKEND_PUBLIC_URL: getOptionalEnv('BACKEND_PUBLIC_URL'),
+  MINI_APP_PUBLIC_URL: getOptionalEnv('MINI_APP_PUBLIC_URL'),
+  DEFAULT_PUBLISH_CHANNEL_ID: getOptionalEnv('DEFAULT_PUBLISH_CHANNEL_ID'),
 } as const;

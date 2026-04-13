@@ -1,9 +1,9 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { OfferEventType } from '@prisma/client';
 
-import { prisma } from '../../../lib/prisma.js';
 import { parseOfferEventBody } from '../schemas/offerEventBodySchema.js';
 import { parseOfferEventParams } from '../schemas/offerEventParamsSchema.js';
+import { recordOfferClick } from './recordOfferClick.js';
 
 export async function trackBuyClickHandler(
   request: FastifyRequest,
@@ -13,27 +13,19 @@ export async function trackBuyClickHandler(
     const { offerId } = parseOfferEventParams(request.params);
     const { viewerTelegramUserId } = parseOfferEventBody(request.body);
 
-    const offer = await prisma.offer.findUnique({
-      where: { id: offerId },
-      select: { id: true, productId: true },
+    const result = await recordOfferClick({
+      offerId,
+      type: OfferEventType.BUY_CLICK,
+      viewerTelegramUserId,
     });
 
-    if (!offer) {
+    if (!result) {
       return reply.code(404).send({
         message: 'Offer not found',
       });
     }
 
-    const event = await prisma.offerEvent.create({
-      data: {
-        offerId: offer.id,
-        productId: offer.productId,
-        type: OfferEventType.BUY_CLICK,
-        viewerTelegramUserId: viewerTelegramUserId ?? null,
-      },
-    });
-
-    return reply.code(201).send(event);
+    return reply.code(201).send(result.event);
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Failed to track BUY click';
