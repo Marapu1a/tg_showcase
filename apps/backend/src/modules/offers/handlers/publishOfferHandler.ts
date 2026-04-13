@@ -3,7 +3,10 @@ import { OfferStatus } from '@prisma/client';
 
 import { env } from '../../../config/env.js';
 import { prisma } from '../../../lib/prisma.js';
-import { publishTelegramMessage } from '../../../lib/telegramPublisher.js';
+import {
+  publishTelegramMessage,
+  publishTelegramPhoto,
+} from '../../../lib/telegramPublisher.js';
 import { parseOfferIdParam } from '../schemas/offerParamsSchema.js';
 
 function buildOfferText(
@@ -37,7 +40,13 @@ export async function publishOfferHandler(
     const offer = await prisma.offer.findUnique({
       where: { id },
       include: {
-        product: true,
+        product: {
+          include: {
+            images: {
+              orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+            },
+          },
+        },
       },
     });
 
@@ -105,15 +114,29 @@ export async function publishOfferHandler(
 
     const text = buildOfferText(offer, offer.product);
 
-    const publishResult = await publishTelegramMessage({
-      botToken: env.TELEGRAM_BOT_TOKEN,
-      channelId,
-      text,
-      buttons: [
-        { text: 'Купить', url: buyUrl },
-        { text: 'Подробнее', url: detailUrl },
-      ],
-    });
+    const imageUrl =
+      offer.product.images.find((image) => image.fileUrl?.trim().length > 0)
+        ?.fileUrl ?? null;
+
+    const buttons = [
+      { text: 'Купить', url: buyUrl },
+      { text: 'Подробнее', url: detailUrl },
+    ];
+
+    const publishResult = imageUrl
+      ? await publishTelegramPhoto({
+          botToken: env.TELEGRAM_BOT_TOKEN,
+          channelId,
+          text,
+          photoUrl: imageUrl,
+          buttons,
+        })
+      : await publishTelegramMessage({
+          botToken: env.TELEGRAM_BOT_TOKEN,
+          channelId,
+          text,
+          buttons,
+        });
 
     const updatedOffer = await prisma.offer.update({
       where: { id },

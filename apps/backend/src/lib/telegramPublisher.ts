@@ -12,7 +12,11 @@ type TelegramPublishInput = {
   botToken: string;
   channelId: string;
   text: string;
-  buttons: [TelegramButton, TelegramButton];
+  buttons: TelegramButton[];
+};
+
+type TelegramPublishPhotoInput = TelegramPublishInput & {
+  photoUrl: string;
 };
 
 type TelegramApiResponse = {
@@ -26,30 +30,18 @@ type TelegramApiResponse = {
   };
 };
 
-export async function publishTelegramMessage(
-  input: TelegramPublishInput,
+async function callTelegramApi(
+  botToken: string,
+  method: 'sendMessage' | 'sendPhoto',
+  body: Record<string, unknown>,
 ): Promise<TelegramSendMessageResult> {
-  const response = await fetch(
-    `https://api.telegram.org/bot${input.botToken}/sendMessage`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        chat_id: input.channelId,
-        text: input.text,
-        reply_markup: {
-          inline_keyboard: [
-            [
-              { text: input.buttons[0].text, url: input.buttons[0].url },
-              { text: input.buttons[1].text, url: input.buttons[1].url },
-            ],
-          ],
-        },
-      }),
+  const response = await fetch(`https://api.telegram.org/bot${botToken}/${method}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
     },
-  );
+    body: JSON.stringify(body),
+  });
 
   const payload = (await response.json()) as TelegramApiResponse;
 
@@ -59,6 +51,53 @@ export async function publishTelegramMessage(
 
   return {
     messageId: String(payload.result.message_id),
-    channelId: String(payload.result.chat?.id ?? input.channelId),
+    channelId: String(payload.result.chat?.id ?? String(body.chat_id)),
   };
+}
+
+export async function publishTelegramMessage(
+  input: TelegramPublishInput,
+): Promise<TelegramSendMessageResult> {
+  const [primary, secondary] = input.buttons;
+
+  if (!primary || !secondary) {
+    throw new Error('Two buttons are required');
+  }
+
+  return callTelegramApi(input.botToken, 'sendMessage', {
+    chat_id: input.channelId,
+    text: input.text,
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: primary.text, url: primary.url },
+          { text: secondary.text, url: secondary.url },
+        ],
+      ],
+    },
+  });
+}
+
+export async function publishTelegramPhoto(
+  input: TelegramPublishPhotoInput,
+): Promise<TelegramSendMessageResult> {
+  const [primary, secondary] = input.buttons;
+
+  if (!primary || !secondary) {
+    throw new Error('Two buttons are required');
+  }
+
+  return callTelegramApi(input.botToken, 'sendPhoto', {
+    chat_id: input.channelId,
+    photo: input.photoUrl,
+    caption: input.text,
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: primary.text, url: primary.url },
+          { text: secondary.text, url: secondary.url },
+        ],
+      ],
+    },
+  });
 }

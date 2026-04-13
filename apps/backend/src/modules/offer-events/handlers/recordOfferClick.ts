@@ -22,7 +22,7 @@ export async function recordOfferClick(input: RecordOfferClickInput) {
     },
   });
 
-  if (!offer) {
+  if (!offer || !offer.product) {
     return null;
   }
 
