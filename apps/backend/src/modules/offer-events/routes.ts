@@ -1,8 +1,9 @@
 import { FastifyInstance } from 'fastify';
 
-import { trackBuyClick, trackDetailClick } from './handlers/index.js';
+import { trackBuyClickHandler } from './handlers/trackBuyClickHandler.js';
+import { trackDetailClickHandler } from './handlers/trackDetailClickHandler.js';
 
 export async function offerEventsRoutes(app: FastifyInstance) {
-  app.get('/click/buy/:offerId', trackBuyClick);
-  app.get('/click/detail/:offerId', trackDetailClick);
+  app.post('/click/buy/:offerId', trackBuyClickHandler);
+  app.post('/click/detail/:offerId', trackDetailClickHandler);
 }

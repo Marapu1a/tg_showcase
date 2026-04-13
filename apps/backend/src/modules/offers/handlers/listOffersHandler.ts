@@ -1,14 +1,27 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 
 import { prisma } from '../../../lib/prisma.js';
+import { parseOfferListQuery } from '../schemas/offerListQuerySchema.js';
 
 export async function listOffersHandler(
-  _request: FastifyRequest,
+  request: FastifyRequest,
   reply: FastifyReply,
 ) {
-  const offers = await prisma.offer.findMany({
-    orderBy: { createdAt: 'desc' },
-  });
+  try {
+    const filters = parseOfferListQuery(request.query);
 
-  return reply.send(offers);
+    const offers = await prisma.offer.findMany({
+      where: filters,
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return reply.send(offers);
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Failed to list offers';
+
+    return reply.code(400).send({
+      message,
+    });
+  }
 }

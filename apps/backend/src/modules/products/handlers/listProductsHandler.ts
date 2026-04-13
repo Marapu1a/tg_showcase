@@ -1,14 +1,27 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 
 import { prisma } from '../../../lib/prisma.js';
+import { parseProductListQuery } from '../schemas/productListQuerySchema.js';
 
 export async function listProductsHandler(
-  _request: FastifyRequest,
+  request: FastifyRequest,
   reply: FastifyReply,
 ) {
-  const products = await prisma.product.findMany({
-    orderBy: { createdAt: 'desc' },
-  });
+  try {
+    const filters = parseProductListQuery(request.query);
 
-  return reply.send(products);
+    const products = await prisma.product.findMany({
+      where: filters,
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return reply.send(products);
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Failed to list products';
+
+    return reply.code(400).send({
+      message,
+    });
+  }
 }

@@ -6,10 +6,12 @@ import { getOfferHandler } from './handlers/getOfferHandler.js';
 import { listOffersHandler } from './handlers/listOffersHandler.js';
 import { publishOfferHandler } from './handlers/publishOfferHandler.js';
 import { updateOfferHandler } from './handlers/updateOfferHandler.js';
+import { offerStatsHandler } from './handlers/offerStatsHandler.js';
 
 export async function offersRoutes(app: FastifyInstance) {
   app.post('/', createOfferHandler);
   app.get('/', listOffersHandler);
+  app.get('/:id/stats', offerStatsHandler);
   app.get('/:id', getOfferHandler);
   app.patch('/:id', updateOfferHandler);
   app.delete('/:id', deleteOfferHandler);
