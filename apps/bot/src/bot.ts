@@ -2,12 +2,14 @@ import { Telegraf } from 'telegraf';
 
 import { env } from './config/env.js';
 import { registerStartCommand } from './commands/start.js';
+import { registerTestPostCommand } from './commands/test-post.js';
 import { registerTextHandlers } from './handlers/text.js';
 import { logger } from './lib/logger.js';
 
 const bot = new Telegraf(env.BOT_TOKEN);
 
 registerStartCommand(bot);
+registerTestPostCommand(bot);
 registerTextHandlers(bot);
 
 bot.catch((error, ctx) => {

@@ -15,4 +15,5 @@ function getRequiredEnv(name: string): string {
 export const env = {
   BOT_TOKEN: getRequiredEnv('BOT_TOKEN'),
   MINI_APP_URL: process.env.MINI_APP_URL ?? 'http://localhost:5173',
+  TEST_CHANNEL_ID: getRequiredEnv('TEST_CHANNEL_ID'),
 } as const;
