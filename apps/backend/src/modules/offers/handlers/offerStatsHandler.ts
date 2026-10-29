@@ -12,7 +12,7 @@ export async function offerStatsHandler(
     const { id } = parseOfferIdParam(request.params);
 
     const offer = await prisma.offer.findUnique({
-      where: { id },
+      where: { id, ownerUserId: request.seller.id },
       select: { id: true, productId: true },
     });
 

@@ -1,6 +1,7 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 
 import { prisma } from '../../../lib/prisma.js';
+import { moneyMinor } from '../../../lib/input.js';
 import { parseProductIdParam } from '../schemas/productParamsSchema.js';
 import { parseUpdateProductBody } from '../schemas/updateProductSchema.js';
 
@@ -13,7 +14,7 @@ export async function updateProductHandler(
     const data = parseUpdateProductBody(request.body);
 
     const existing = await prisma.product.findUnique({
-      where: { id },
+      where: { id, ownerUserId: request.seller.id },
       select: { id: true },
     });
 
@@ -24,8 +25,8 @@ export async function updateProductHandler(
     }
 
     const product = await prisma.product.update({
-      where: { id },
-      data,
+      where: { id, ownerUserId: request.seller.id, ...(typeof data.quantityLimit === 'number' ? {reservedQuantity:{lte:data.quantityLimit}} : {}) },
+      data: {...data,...(data.priceText !== undefined ? {priceMinor:moneyMinor(data.priceText)} : {})},
     });
 
     return reply.send(product);

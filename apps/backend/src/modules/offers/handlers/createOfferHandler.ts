@@ -8,7 +8,10 @@ export async function createOfferHandler(
   reply: FastifyReply,
 ) {
   try {
-    const data = parseCreateOfferBody(request.body);
+    const data = parseCreateOfferBody({
+      ...(request.body as object),
+      ownerUserId: request.seller.id,
+    });
 
     const owner = await prisma.user.findUnique({
       where: { id: data.ownerUserId },
@@ -22,7 +25,7 @@ export async function createOfferHandler(
     }
 
     const product = await prisma.product.findUnique({
-      where: { id: data.productId },
+      where: { id: data.productId, ownerUserId: request.seller.id },
       select: { id: true, ownerUserId: true },
     });
 

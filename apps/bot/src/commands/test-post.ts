@@ -17,6 +17,10 @@ const testPostKeyboard = Markup.inlineKeyboard([
 
 export function registerTestPostCommand(bot: Telegraf) {
   bot.command('testpost', async (ctx) => {
+    if (!ctx.from || !env.ADMIN_TELEGRAM_USER_IDS.includes(String(ctx.from.id))) {
+      await ctx.reply('Команда доступна только администратору.');
+      return;
+    }
     try {
       await ctx.telegram.sendMessage(env.TEST_CHANNEL_ID, testPostText, {
         reply_markup: testPostKeyboard.reply_markup,

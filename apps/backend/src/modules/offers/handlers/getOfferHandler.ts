@@ -11,7 +11,7 @@ export async function getOfferHandler(
     const { id } = parseOfferIdParam(request.params);
 
     const offer = await prisma.offer.findUnique({
-      where: { id },
+      where: { id, ownerUserId: request.seller.id },
     });
 
     if (!offer) {

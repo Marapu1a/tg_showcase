@@ -11,7 +11,7 @@ export async function deleteOfferHandler(
     const { id } = parseOfferIdParam(request.params);
 
     const existing = await prisma.offer.findUnique({
-      where: { id },
+      where: { id, ownerUserId: request.seller.id },
       select: { id: true },
     });
 
@@ -21,8 +21,9 @@ export async function deleteOfferHandler(
       });
     }
 
-    const offer = await prisma.offer.delete({
-      where: { id },
+    const offer = await prisma.offer.update({
+      where: { id, ownerUserId: request.seller.id },
+      data: { status: 'ARCHIVED' },
     });
 
     return reply.send(offer);

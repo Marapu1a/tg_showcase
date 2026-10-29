@@ -1,17 +1,28 @@
 import { FastifyInstance } from 'fastify';
 
-import { createProductHandler } from './handlers/createProductHandler.js';
-import { createProductImageHandler } from './handlers/createProductImageHandler.js';
+import { validateLegacyBody } from '../../plugins/abuse-limits.js';
 import { deleteProductHandler } from './handlers/deleteProductHandler.js';
 import { getProductHandler } from './handlers/getProductHandler.js';
 import { listProductsHandler } from './handlers/listProductsHandler.js';
 import { updateProductHandler } from './handlers/updateProductHandler.js';
 
 export async function productsRoutes(app: FastifyInstance) {
-  app.post('/', createProductHandler);
-  app.post('/:id/images', createProductImageHandler);
+  app.post('/', async (_request, reply) =>
+    reply.code(410).send({ message: 'Используйте форму создания товара.' }),
+  );
+  app.post('/:id/images', async (_request, reply) =>
+    reply.code(410).send({ message: 'Загрузите фото через форму товара.' }),
+  );
   app.get('/', listProductsHandler);
   app.get('/:id', getProductHandler);
-  app.patch('/:id', updateProductHandler);
+  app.patch(
+    '/:id',
+    {
+      preValidation: async (request) => {
+        validateLegacyBody(request.body);
+      },
+    },
+    updateProductHandler,
+  );
   app.delete('/:id', deleteProductHandler);
 }

@@ -1,391 +1,329 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
-
+import { FormEvent, useEffect, useRef, useState } from 'react';
+import { priceError, quantityError } from '../lib/validation';
+import { Link } from 'react-router-dom';
 import {
-  createOffer,
-  createProduct,
-  createProductImage,
-  ensureTelegramUser,
+  ApiRequestError,
+  assetUrl,
+  errorText,
+  money,
   publishOffer,
+  requestJson,
 } from '../api/client';
 
-type TelegramUser = {
-  id: number;
-  username?: string;
-  first_name?: string;
-  last_name?: string;
-};
-
-declare global {
-  interface Window {
-    Telegram?: {
-      WebApp?: {
-        initDataUnsafe?: {
-          user?: TelegramUser;
-        };
-        ready?: () => void;
-      };
-    };
-  }
-}
-
-type SubmitResult = {
-  productId: string;
-  offerId: string;
-  offerStatus: string;
-  published: boolean;
-  telegramMessageId?: string | null;
-};
-
-function getTelegramUser(): TelegramUser | undefined {
-  return window.Telegram?.WebApp?.initDataUnsafe?.user;
-}
-
-function isNonEmptyString(value: string) {
-  return value.trim().length > 0;
-}
-
-function parsePositiveInt(value: string): number | null {
-  if (!value.trim()) return null;
-  const num = Number(value);
-  if (!Number.isInteger(num) || num < 1) return NaN;
-  return num;
-}
-
 export function OfferCreatePage() {
-  const telegramUser = getTelegramUser();
-  const searchParams = useMemo(() => new URLSearchParams(window.location.search), []);
-
-  const [productTitle, setProductTitle] = useState('');
-  const [productDescription, setProductDescription] = useState('');
-  const [priceText, setPriceText] = useState('');
-  const [checkoutUrl, setCheckoutUrl] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
-  const [quantityLimit, setQuantityLimit] = useState('');
-  const [offerTitle, setOfferTitle] = useState('');
-  const [offerText, setOfferText] = useState('');
-  const [channelId, setChannelId] = useState('');
-
-  const [devTelegramUserId, setDevTelegramUserId] = useState(
-    searchParams.get('devUserId') ?? '',
-  );
-  const [devUsername, setDevUsername] = useState(searchParams.get('devUsername') ?? '');
-  const [devFirstName, setDevFirstName] = useState(
-    searchParams.get('devFirstName') ?? '',
-  );
-  const [devLastName, setDevLastName] = useState(searchParams.get('devLastName') ?? '');
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<SubmitResult | null>(null);
-  const [healthStatus, setHealthStatus] = useState<string | null>(null);
-  const [healthError, setHealthError] = useState<string | null>(null);
-
-  async function submitFlow(publish: boolean) {
-    setError(null);
-    setResult(null);
-
-    if (!isNonEmptyString(productTitle)) {
-      setError('Введите название товара.');
-      return;
-    }
-    if (!isNonEmptyString(priceText)) {
-      setError('Введите цену товара.');
-      return;
-    }
-    if (!isNonEmptyString(checkoutUrl)) {
-      setError('Введите ссылку на оплату.');
-      return;
-    }
-    if (!isNonEmptyString(offerTitle)) {
-      setError('Введите заголовок офера.');
-      return;
-    }
-
-    if (imageUrl && !isNonEmptyString(imageUrl)) {
-      setError('Ссылка на картинку не должна быть пустой.');
-      return;
-    }
-
-    const parsedQuantity = parsePositiveInt(quantityLimit);
-    if (parsedQuantity !== null && Number.isNaN(parsedQuantity)) {
-      setError('Лимит количества должен быть положительным целым числом.');
-      return;
-    }
-
-    const tgUser = telegramUser;
-    if (!tgUser && !isNonEmptyString(devTelegramUserId)) {
-      setError('Telegram user недоступен. Укажите devUserId.');
-      return;
-    }
-
-    const ownerPayload = tgUser
-      ? {
-          telegramUserId: String(tgUser.id),
-          username: tgUser.username,
-          firstName: tgUser.first_name,
-          lastName: tgUser.last_name,
-        }
-      : {
-          telegramUserId: devTelegramUserId.trim(),
-          username: devUsername.trim() || undefined,
-          firstName: devFirstName.trim() || undefined,
-          lastName: devLastName.trim() || undefined,
-        };
-
-    setIsSubmitting(true);
-
+  const [pending, setPending] = useState<Record<string, unknown> | null>(() => {
     try {
-      let step = 'ensure user';
-      const owner = await ensureTelegramUser(ownerPayload);
-
-      step = 'create product';
-      const product = await createProduct({
-        ownerUserId: owner.id,
-        title: productTitle.trim(),
-        description: productDescription.trim() || undefined,
-        priceText: priceText.trim(),
-        checkoutUrl: checkoutUrl.trim(),
-        quantityLimit: parsedQuantity === null ? undefined : parsedQuantity,
+      return JSON.parse(sessionStorage.getItem('listing-pending') ?? 'null');
+    } catch {
+      return null;
+    }
+  });
+  const [title, setTitle] = useState(String(pending?.title ?? ''));
+  const [description, setDescription] = useState(
+    String(pending?.description ?? ''),
+  );
+  const [price, setPrice] = useState(String(pending?.price ?? ''));
+  const [quantity, setQuantity] = useState(
+    String(pending?.quantityLimit ?? ''),
+  );
+  const [photo, setPhoto] = useState<{ id: string; url: string } | null>(
+    pending?.photoId
+      ? {
+          id: String(pending.photoId),
+          url: '/media/' + String(pending.photoId),
+        }
+      : null,
+  );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [saved, setSaved] = useState<{ id: string; status: string } | null>(
+    null,
+  );
+  const key = useRef(String(pending?.requestKey ?? crypto.randomUUID()));
+  const working = useRef(false);
+  const priceIssue = priceError(price);
+  const quantityIssue = quantity ? quantityError(quantity, 100000) : '';
+  const valid =
+    title.trim().length > 0 &&
+    title.length <= 100 &&
+    description.length <= 700 &&
+    !priceIssue &&
+    !quantityIssue;
+  const authorized = Boolean(window.Telegram?.WebApp?.initData);
+  useEffect(() => {
+    window.Telegram?.WebApp?.ready?.();
+  }, []);
+  async function upload(file?: File) {
+    if (!file || working.current || pending || !authorized) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setError('Выберите JPEG, PNG или WebP.');
+      return;
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      setError('Выберите фото размером до 4 МБ.');
+      return;
+    }
+    working.current = true;
+    setBusy(true);
+    setError('');
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error('Не удалось прочитать фото.'));
+        reader.readAsDataURL(file);
       });
-
-      if (imageUrl.trim()) {
-        step = 'create product image';
-        await createProductImage(product.id, {
-          fileUrl: imageUrl.trim(),
-        });
-      }
-
-      step = 'create offer';
-      const offer = await createOffer({
-        productId: product.id,
-        ownerUserId: owner.id,
-        title: offerTitle.trim(),
-        text: offerText.trim() || undefined,
-        channelId: channelId.trim() || undefined,
-      });
-
-      let published = false;
-      let publishedOffer = offer;
-
-      if (publish) {
-        step = 'publish offer';
-        publishedOffer = await publishOffer(offer.id);
-        published = true;
-      }
-
-      setResult({
-        productId: product.id,
-        offerId: offer.id,
-        offerStatus: publishedOffer.status ?? offer.status,
-        telegramMessageId: publishedOffer.telegramMessageId ?? null,
-        published,
-      });
+      setPhoto(
+        await requestJson('/listings/photo', {
+          method: 'POST',
+          body: JSON.stringify({ dataUrl }),
+        }),
+      );
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Ошибка запроса';
-      if (message === 'Failed to fetch') {
-        setError(
-          `Failed to fetch. Проверьте доступность API (${import.meta.env.VITE_API_URL}) и CORS.`,
-        );
-      } else {
-        setError(message);
-      }
+      setError(errorText(err));
     } finally {
-      setIsSubmitting(false);
+      working.current = false;
+      setBusy(false);
     }
   }
-
-  const onSave = (event: FormEvent) => {
+  async function save(event: FormEvent) {
     event.preventDefault();
-    void submitFlow(false);
-  };
-
-  const onPublish = (event: FormEvent) => {
-    event.preventDefault();
-    void submitFlow(true);
-  };
-
-  useEffect(() => {
-    async function checkHealth() {
-      try {
-        const base = import.meta.env.VITE_API_URL;
-        const response = await fetch(`${base}/health`);
-        if (!response.ok) {
-          setHealthStatus(`health ${response.status}`);
-          return;
-        }
-        setHealthStatus('health ok');
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'health failed';
-        setHealthError(message);
+    if (working.current || !authorized || (!valid && !pending)) return;
+    const payload = pending ?? {
+      requestKey: key.current,
+      title,
+      description,
+      price,
+      photoId: photo?.id,
+      quantityLimit: quantity ? Number(quantity) : null,
+    };
+    sessionStorage.setItem('listing-pending', JSON.stringify(payload));
+    setPending(payload);
+    working.current = true;
+    setBusy(true);
+    setError('');
+    try {
+      setSaved(
+        await requestJson('/listings', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        }),
+      );
+      sessionStorage.removeItem('listing-pending');
+      setPending(null);
+    } catch (err) {
+      if (!pending && err instanceof ApiRequestError && err.status < 500) {
+        sessionStorage.removeItem('listing-pending');
+        setPending(null);
       }
+      setError(errorText(err));
+    } finally {
+      working.current = false;
+      setBusy(false);
     }
-
-    void checkHealth();
-  }, []);
-
+  }
+  async function publish() {
+    if (!saved || working.current || !authorized) return;
+    working.current = true;
+    setBusy(true);
+    setError('');
+    try {
+      const result = await publishOffer(saved.id);
+      setSaved({ id: saved.id, status: result.status });
+    } catch (err) {
+      setError(errorText(err));
+    } finally {
+      working.current = false;
+      setBusy(false);
+    }
+  }
   return (
-    <section className="panel">
-      <p className="eyebrow">Create Offer</p>
-      <h2>Новый офер</h2>
-      <p>Заполните данные товара и офера, затем сохраните или сразу опубликуйте.</p>
-
-      <div className="alert">
-        <p>API: {import.meta.env.VITE_API_URL}</p>
-        {healthStatus && <p>{healthStatus}</p>}
-        {healthError && <p>health error: {healthError}</p>}
-      </div>
-
-      <form className="form-stack" onSubmit={onSave}>
-        <div className="form-grid">
-          <div className="field">
-            <label>Название товара *</label>
-            <input
-              value={productTitle}
-              onChange={(event) => setProductTitle(event.target.value)}
-              placeholder="Например: Умный термос 500 мл"
-              required
-            />
-          </div>
-          <div className="field">
-            <label>Описание товара</label>
-            <textarea
-              value={productDescription}
-              onChange={(event) => setProductDescription(event.target.value)}
-              placeholder="Коротко о товаре"
-            />
-          </div>
-          <div className="field">
-            <label>Цена *</label>
-            <input
-              value={priceText}
-              onChange={(event) => setPriceText(event.target.value)}
-              placeholder="1490 ₽"
-              required
-            />
-          </div>
-          <div className="field">
-            <label>Checkout URL *</label>
-            <input
-              value={checkoutUrl}
-              onChange={(event) => setCheckoutUrl(event.target.value)}
-              placeholder="https://pay.example.com/checkout"
-              required
-            />
-          </div>
-          <div className="field">
-            <label>Image URL</label>
-            <input
-              value={imageUrl}
-              onChange={(event) => setImageUrl(event.target.value)}
-              placeholder="https://cdn.example.com/image.jpg"
-            />
-          </div>
-          <div className="field">
-            <label>Лимит количества</label>
-            <input
-              value={quantityLimit}
-              onChange={(event) => setQuantityLimit(event.target.value)}
-              placeholder="10"
-              inputMode="numeric"
-            />
-          </div>
+    <section className="panel onboarding">
+      <p className="eyebrow">
+        {saved ? 'Предпросмотр публикации' : 'Ваш товар'}
+      </p>
+      <h2>{saved ? title : 'Новый товар'}</h2>
+      {!window.Telegram?.WebApp?.initData && (
+        <p className="alert">Для сохранения откройте приложение через бота.</p>
+      )}
+      {error && (
+        <div role="alert" className="alert error">
+          {error}
         </div>
-
-        <div className="form-grid">
-          <div className="field">
-            <label>Заголовок офера *</label>
-            <input
-              value={offerTitle}
-              onChange={(event) => setOfferTitle(event.target.value)}
-              placeholder="Офер: умный термос для путешествий"
-              required
+      )}
+      {pending && !busy && (
+        <p className="alert" role="status">
+          Подтверждение сохранения не получено. Повторная проверка использует те
+          же данные и не создаёт второй товар.
+        </p>
+      )}
+      {saved ? (
+        <>
+          {photo && (
+            <img
+              className="product-photo"
+              src={assetUrl(photo.url)}
+              alt={title}
             />
-          </div>
-          <div className="field">
-            <label>Текст офера</label>
-            <textarea
-              value={offerText}
-              onChange={(event) => setOfferText(event.target.value)}
-              placeholder="Короткий текст предложения"
-            />
-          </div>
-          <div className="field">
-            <label>Channel ID (optional)</label>
-            <input
-              value={channelId}
-              onChange={(event) => setChannelId(event.target.value)}
-              placeholder="@channel или -100..."
-            />
-          </div>
-        </div>
-
-        {import.meta.env.DEV && !telegramUser && (
-          <div className="dev-box">
-            <p>Dev fallback: Telegram user недоступен.</p>
-            <div className="form-grid">
-              <div className="field">
-                <label>Dev Telegram User ID *</label>
-                <input
-                  value={devTelegramUserId}
-                  onChange={(event) => setDevTelegramUserId(event.target.value)}
-                  placeholder="123456789"
-                />
-              </div>
-              <div className="field">
-                <label>Username</label>
-                <input
-                  value={devUsername}
-                  onChange={(event) => setDevUsername(event.target.value)}
-                  placeholder="username"
-                />
-              </div>
-              <div className="field">
-                <label>First name</label>
-                <input
-                  value={devFirstName}
-                  onChange={(event) => setDevFirstName(event.target.value)}
-                  placeholder="Имя"
-                />
-              </div>
-              <div className="field">
-                <label>Last name</label>
-                <input
-                  value={devLastName}
-                  onChange={(event) => setDevLastName(event.target.value)}
-                  placeholder="Фамилия"
-                />
-              </div>
+          )}
+          <p className="price">
+            {money(Math.round(Number(price.replace(',', '.')) * 100))}
+          </p>
+          <p className="preserve-lines">{description}</p>
+          <p>
+            Покупатель оставит заявку. Оплату и получение вы согласуете лично.
+          </p>
+          {saved.status === 'ACTIVE' ? (
+            <div className="alert success">
+              Опубликовано.{' '}
+              <Link to={`/offers/${saved.id}`}>
+                Открыть карточку покупателя →
+              </Link>
             </div>
-          </div>
-        )}
-
-        {error && <div className="alert error">{error}</div>}
-
-        {result && (
-          <div className="alert success">
-            <p>Готово: продукт создан, офер создан.</p>
-            <p>Product ID: {result.productId}</p>
-            <p>Offer ID: {result.offerId}</p>
-            <p>Статус: {result.offerStatus}</p>
-            <p>Опубликован: {result.published ? 'да' : 'нет'}</p>
-            {result.telegramMessageId && (
-              <p>Telegram message id: {result.telegramMessageId}</p>
+          ) : (
+            <>
+              <p>
+                Черновик сохранён. Пост будет отправлен в ваш подключённый
+                канал.
+              </p>
+              <div className="button-row">
+                <button
+                  disabled={busy || Boolean(pending) || !authorized}
+                  onClick={() => {
+                    void publish();
+                  }}
+                >
+                  {busy ? 'Публикуем…' : 'Опубликовать в канале'}
+                </button>
+              </div>
+            </>
+          )}
+          <p>
+            <Link to="/products">К моим товарам →</Link>
+          </p>
+        </>
+      ) : (
+        <form
+          className="form-stack"
+          onSubmit={(event) => {
+            void save(event);
+          }}
+        >
+          <div className="field">
+            <label htmlFor="photo">Фото</label>
+            <input
+              id="photo"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              disabled={busy || Boolean(pending) || !authorized}
+              onChange={(event) => {
+                void upload(event.target.files?.[0]);
+                event.target.value = '';
+              }}
+            />
+            <span className="muted">JPEG, PNG или WebP, до 4 МБ</span>
+            {photo && (
+              <>
+                <img
+                  className="product-photo"
+                  src={assetUrl(photo.url)}
+                  alt="Выбранное фото"
+                />
+                <div className="button-row">
+                  <button
+                    type="button"
+                    disabled={busy || Boolean(pending) || !authorized}
+                    onClick={() => setPhoto(null)}
+                  >
+                    Убрать фото
+                  </button>
+                </div>
+              </>
             )}
-            <p>
-              Ссылка: <a href={`/offers/${result.offerId}`}>/offers/{result.offerId}</a>
-            </p>
           </div>
-        )}
-
-        <div className="button-row">
-          <button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Сохраняем...' : 'Сохранить офер'}
-          </button>
-          <button type="button" onClick={onPublish} disabled={isSubmitting}>
-            {isSubmitting ? 'Публикуем...' : 'Создать и опубликовать'}
-          </button>
-        </div>
-      </form>
+          <div className="field">
+            <label htmlFor="title">Название</label>
+            <input
+              id="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              maxLength={100}
+              required
+              disabled={busy || Boolean(pending) || !authorized}
+              placeholder="Шерстяные носки"
+            />
+            <span className="muted">{title.length}/100</span>
+          </div>
+          <div className="field">
+            <label htmlFor="price">Цена за штуку, ₽</label>
+            <input
+              id="price"
+              maxLength={9}
+              aria-invalid={Boolean(price && priceIssue)}
+              aria-describedby="price-hint"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              inputMode="decimal"
+              required
+              disabled={busy || Boolean(pending) || !authorized}
+              placeholder="600"
+            />
+            <span
+              id="price-hint"
+              className={price && priceIssue ? 'field-error' : 'muted'}
+            >
+              {priceIssue}
+            </span>
+          </div>
+          <div className="field">
+            <label htmlFor="description">Описание · необязательно</label>
+            <textarea
+              id="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              maxLength={700}
+              disabled={busy || Boolean(pending) || !authorized}
+              placeholder="Размер, материал и другие детали"
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="quantity">
+              Количество в наличии · необязательно
+            </label>
+            <input
+              id="quantity"
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              aria-invalid={Boolean(quantityIssue)}
+              aria-describedby="stock-hint"
+              min={1}
+              max={100000}
+              step={1}
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              disabled={busy || Boolean(pending) || !authorized}
+              placeholder="Без ограничения"
+            />
+            <span id="stock-hint" className="field-error">
+              {quantityIssue}
+            </span>
+            <span className="muted">
+              Заявка занимает указанное количество. Отмена возвращает его в
+              доступные.
+            </span>
+          </div>
+          <div className="button-row">
+            <button disabled={busy || !authorized || (!pending && !valid)}>
+              {busy
+                ? 'Сохраняем…'
+                : pending
+                  ? 'Проверить сохранение'
+                  : 'Сохранить и посмотреть пост'}
+            </button>
+          </div>
+        </form>
+      )}
     </section>
   );
 }

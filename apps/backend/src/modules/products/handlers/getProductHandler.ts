@@ -11,7 +11,7 @@ export async function getProductHandler(
     const { id } = parseProductIdParam(request.params);
 
     const product = await prisma.product.findUnique({
-      where: { id },
+      where: { id, ownerUserId: request.seller.id },
     });
 
     if (!product) {

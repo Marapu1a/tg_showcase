@@ -13,7 +13,7 @@ export async function updateOfferHandler(
     const data = parseUpdateOfferBody(request.body);
 
     const existing = await prisma.offer.findUnique({
-      where: { id },
+      where: { id, ownerUserId: request.seller.id },
       select: { id: true },
     });
 
@@ -24,7 +24,7 @@ export async function updateOfferHandler(
     }
 
     const offer = await prisma.offer.update({
-      where: { id },
+      where: { id, ownerUserId: request.seller.id },
       data,
     });
 

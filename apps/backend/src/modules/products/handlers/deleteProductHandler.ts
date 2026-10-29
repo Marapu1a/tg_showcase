@@ -11,7 +11,7 @@ export async function deleteProductHandler(
     const { id } = parseProductIdParam(request.params);
 
     const existing = await prisma.product.findUnique({
-      where: { id },
+      where: { id, ownerUserId: request.seller.id },
       select: { id: true },
     });
 
@@ -21,8 +21,9 @@ export async function deleteProductHandler(
       });
     }
 
-    const product = await prisma.product.delete({
-      where: { id },
+    const product = await prisma.product.update({
+      where: { id, ownerUserId: request.seller.id },
+      data: { status: 'ARCHIVED' },
     });
 
     return reply.send(product);

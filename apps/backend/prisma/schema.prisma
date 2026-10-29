@@ -24,6 +24,13 @@ enum OfferEventType {
   DETAIL_CLICK
 }
 
+enum OrderStatus {
+  NEW
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
 model User {
   id             String  @id @default(cuid())
   telegramUserId String  @unique
@@ -33,11 +40,23 @@ model User {
 
   products Product[]
   offers   Offer[]
+  channel  SellerChannel?
+  orders OrderRequest[]
+  media Media[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([createdAt])
+}
+
+model SellerChannel {
+  ownerUserId String @id
+  channelId String @unique
+  title String
+  username String?
+  verifiedAt DateTime @default(now())
+  ownerUser User @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
 }
 
 model Product {
@@ -46,7 +65,9 @@ model Product {
   title         String
   description   String?
   priceText     String
-  checkoutUrl   String
+  checkoutUrl   String?
+  priceMinor Int?
+  reservedQuantity Int @default(0)
   status        ProductStatus @default(ACTIVE)
   quantityLimit Int?
 
@@ -54,6 +75,7 @@ model Product {
   images      ProductImage[]
   offers      Offer[]
   offerEvents OfferEvent[]
+  orders OrderRequest[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -89,6 +111,9 @@ model Offer {
   channelId         String?
   telegramMessageId String?
   publishedAt       DateTime?
+  creationKey String? @unique
+  creationFingerprint String?
+  publishState String @default("IDLE")
 
   product   Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
   ownerUser User         @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
@@ -101,6 +126,49 @@ model Offer {
   @@index([ownerUserId])
   @@index([status])
   @@index([publishedAt])
+}
+
+model Media {
+  id String @id @default(cuid())
+  ownerUserId String
+  data Bytes
+  createdAt DateTime @default(now())
+  ownerUser User @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  @@index([ownerUserId])
+}
+
+model OrderRequest {
+  id String @id @default(cuid())
+  number Int @unique @default(autoincrement())
+  ownerUserId String
+  productId String
+  offerId String
+  requestKey String @unique
+  requestFingerprint String
+  productTitle String
+  unitPriceMinor Int
+  totalMinor Int
+  currency String @default("RUB")
+  quantity Int
+  buyerName String?
+  buyerTelegramUserId String?
+  contact String
+  contactType String
+  contactVerified Boolean @default(false)
+  comment String?
+  status OrderStatus @default(NEW)
+  notificationState String @default("PENDING")
+  notificationAttempts Int @default(0)
+  notificationNextAt DateTime @default(now())
+  notificationSentAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ownerUser User @relation(fields: [ownerUserId], references: [id], onDelete: Restrict)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([ownerUserId, status, createdAt])
+  @@index([notificationState, notificationNextAt])
+  @@index([offerId, createdAt])
 }
 
 model OfferEvent {

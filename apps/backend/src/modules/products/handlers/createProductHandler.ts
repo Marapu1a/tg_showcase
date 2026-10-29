@@ -1,6 +1,7 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 
 import { prisma } from '../../../lib/prisma.js';
+import { moneyMinor } from '../../../lib/input.js';
 import { parseCreateProductBody } from '../schemas/createProductSchema.js';
 
 export async function createProductHandler(
@@ -8,7 +9,10 @@ export async function createProductHandler(
   reply: FastifyReply,
 ) {
   try {
-    const data = parseCreateProductBody(request.body);
+    const data = parseCreateProductBody({
+      ...(request.body as object),
+      ownerUserId: request.seller.id,
+    });
 
     const owner = await prisma.user.findUnique({
       where: { id: data.ownerUserId },
@@ -27,6 +31,7 @@ export async function createProductHandler(
         title: data.title,
         description: data.description,
         priceText: data.priceText,
+        priceMinor: moneyMinor(data.priceText),
         checkoutUrl: data.checkoutUrl,
         status: data.status,
         quantityLimit: data.quantityLimit,

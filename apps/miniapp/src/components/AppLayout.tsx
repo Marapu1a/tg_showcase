@@ -1,31 +1,28 @@
-import { NavLink, Outlet } from 'react-router-dom';
-
-const links = [
-  { to: '/dashboard', label: 'Dashboard' },
-  { to: '/products', label: 'Products' },
-  { to: '/offers', label: 'Offers' },
-];
-
+import { Link, Outlet, useLocation } from 'react-router-dom';
 export function AppLayout() {
+  const { pathname } = useLocation();
+  const buyerPage = /^\/offers\/(?!new$)[^/]+$/.test(pathname);
   return (
     <div className="app-shell">
       <header className="app-header">
-        <div>
-          <p className="eyebrow">Telegram-first offers</p>
-          <h1>tg_showcase</h1>
-        </div>
-        <nav className="nav">
-          {links.map((link) => (
-            <NavLink
-              key={link.to}
-              className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}
-              to={link.to}
-            >
-              {link.label}
-            </NavLink>
-          ))}
-        </nav>
+        <Link to="/dashboard" aria-label="На главную">
+          <p className="eyebrow">Продажи в вашем канале</p>
+          <h1>Витрина</h1>
+        </Link>
       </header>
+      {!buyerPage && window.Telegram?.WebApp?.initData && (
+        <nav className="nav seller-nav">
+          <Link className="nav-link" to="/dashboard">
+            Канал
+          </Link>
+          <Link className="nav-link" to="/products">
+            Товары
+          </Link>
+          <Link className="nav-link" to="/orders">
+            Заказы
+          </Link>
+        </nav>
+      )}
       <main className="page-content">
         <Outlet />
       </main>

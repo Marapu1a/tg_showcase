@@ -13,7 +13,7 @@ export async function createProductImageHandler(
     const data = parseCreateProductImageBody(request.body);
 
     const product = await prisma.product.findUnique({
-      where: { id },
+      where: { id, ownerUserId: request.seller.id },
       select: { id: true },
     });
 

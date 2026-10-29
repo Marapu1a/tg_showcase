@@ -25,7 +25,10 @@ function validateOfferStatus(value: unknown): OfferStatus {
   throw new Error('status must be one of: DRAFT, ACTIVE, ARCHIVED');
 }
 
-function parseOptionalNullableString(value: unknown, field: string): string | null {
+function parseOptionalNullableString(
+  value: unknown,
+  field: string,
+): string | null {
   if (value === null) {
     return null;
   }
@@ -35,25 +38,6 @@ function parseOptionalNullableString(value: unknown, field: string): string | nu
   }
 
   return value.trim();
-}
-
-function parseDateValue(value: unknown, field: string): Date {
-  if (value instanceof Date) {
-    if (Number.isNaN(value.getTime())) {
-      throw new Error(`${field} must be a valid date`);
-    }
-    return value;
-  }
-
-  if (typeof value === 'string' || typeof value === 'number') {
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) {
-      throw new Error(`${field} must be a valid date`);
-    }
-    return parsed;
-  }
-
-  throw new Error(`${field} must be a valid date`);
 }
 
 export function parseUpdateOfferBody(body: unknown): UpdateOfferBody {
@@ -79,22 +63,12 @@ export function parseUpdateOfferBody(body: unknown): UpdateOfferBody {
     data.status = validateOfferStatus(payload.status);
   }
 
-  if (payload.channelId !== undefined) {
-    data.channelId = parseOptionalNullableString(payload.channelId, 'channelId');
-  }
-
-  if (payload.telegramMessageId !== undefined) {
-    data.telegramMessageId = parseOptionalNullableString(
-      payload.telegramMessageId,
-      'telegramMessageId',
-    );
-  }
-
-  if (payload.publishedAt !== undefined) {
-    data.publishedAt =
-      payload.publishedAt === null
-        ? null
-        : parseDateValue(payload.publishedAt, 'publishedAt');
+  if (
+    payload.channelId !== undefined ||
+    payload.telegramMessageId !== undefined ||
+    payload.publishedAt !== undefined
+  ) {
+    throw new Error('Канал и данные публикации определяются сервером.');
   }
 
   if (Object.keys(data).length === 0) {

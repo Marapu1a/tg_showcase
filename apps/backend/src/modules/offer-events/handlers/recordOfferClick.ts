@@ -10,7 +10,11 @@ type RecordOfferClickInput = {
 
 export async function recordOfferClick(input: RecordOfferClickInput) {
   const offer = await prisma.offer.findUnique({
-    where: { id: input.offerId },
+    where: {
+      id: input.offerId,
+      status: 'ACTIVE',
+      product: { status: 'ACTIVE' },
+    },
     select: {
       id: true,
       productId: true,

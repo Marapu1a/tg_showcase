@@ -11,8 +11,9 @@ export async function listProductsHandler(
     const filters = parseProductListQuery(request.query);
 
     const products = await prisma.product.findMany({
-      where: filters,
+      where: { ...filters, ownerUserId: request.seller.id },
       orderBy: { createdAt: 'desc' },
+      take: 100,
     });
 
     return reply.send(products);

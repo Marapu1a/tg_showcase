@@ -5,7 +5,7 @@ export type CreateProductBody = {
   title: string;
   description?: string;
   priceText: string;
-  checkoutUrl: string;
+  checkoutUrl?: string;
   status?: ProductStatus;
   quantityLimit?: number | null;
 };
@@ -33,10 +33,6 @@ export function parseCreateProductBody(body: unknown): CreateProductBody {
     throw new Error('priceText is required');
   }
 
-  if (!isNonEmptyString(payload.checkoutUrl)) {
-    throw new Error('checkoutUrl is required');
-  }
-
   const description =
     typeof payload.description === 'string' ? payload.description.trim() : undefined;
 
@@ -55,7 +51,7 @@ export function parseCreateProductBody(body: unknown): CreateProductBody {
     title: payload.title.trim(),
     description,
     priceText: payload.priceText.trim(),
-    checkoutUrl: payload.checkoutUrl.trim(),
+    checkoutUrl: typeof payload.checkoutUrl === 'string' ? payload.checkoutUrl.trim() : undefined,
     status,
     quantityLimit,
   };
