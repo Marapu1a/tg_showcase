@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { contactError, quantityError } from '../lib/validation';
-import { useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import {
   PublicOffer,
   ApiRequestError,
@@ -12,7 +12,10 @@ import {
 
 function OfferDetailContent() {
   const { id } = useParams();
+  const [params] = useSearchParams();
+  const preview = params.get('preview') === '1';
   const [pending, setPending] = useState<Record<string, unknown> | null>(() => {
+    if (preview) return null;
     try {
       return JSON.parse(
         sessionStorage.getItem(`order-pending:${id}`) ?? 'null',
@@ -46,7 +49,12 @@ function OfferDetailContent() {
   const [result, setResult] = useState<{
     number: number;
     quantity: number;
+    productTitle?: string;
+    totalMinor?: number;
+    currency?: string;
+    buyerContactUsername?: string | null;
   } | null>(() => {
+    if (preview) return null;
     try {
       return JSON.parse(
         sessionStorage.getItem(`order-receipt:${id}`) ?? 'null',
@@ -82,6 +90,7 @@ function OfferDetailContent() {
               imageUrl: null,
               available: null,
               priceMinor: Number(pending.unitPriceMinor),
+              currency: String(pending.currency ?? 'RUB'),
             });
         }
       })
@@ -95,8 +104,12 @@ function OfferDetailContent() {
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (
+      preview ||
       !offer ||
-      (!pending && (!valid || offer.available === 0)) ||
+      (!pending &&
+        (!valid ||
+          offer.available === 0 ||
+          (offer.saleStatus && offer.saleStatus !== 'ACTIVE'))) ||
       submitting.current
     )
       return;
@@ -107,14 +120,21 @@ function OfferDetailContent() {
       requestKey: key,
       quantity: Number(quantity),
       unitPriceMinor: offer.priceMinor,
+      currency: offer.currency,
       contactType,
       contact,
       comment,
     };
-    sessionStorage.setItem(`order-pending:${id}`, JSON.stringify(payload));
-    setPending(payload);
     try {
-      const receipt = await requestJson<{ number: number }>(
+      sessionStorage.setItem(`order-pending:${id}`, JSON.stringify(payload));
+      setPending(payload);
+      const receipt = await requestJson<{
+        number: number;
+        quantity: number;
+        productTitle: string;
+        totalMinor: number;
+        buyerContactUsername: string | null;
+      }>(
         `/public/offers/${id}/orders`,
         {
           method: 'POST',
@@ -122,14 +142,14 @@ function OfferDetailContent() {
         },
         false,
       );
-      const confirmed = { ...receipt, quantity: Number(quantity) };
+      const confirmed = receipt;
       sessionStorage.setItem(`order-receipt:${id}`, JSON.stringify(confirmed));
       setResult(confirmed);
       sessionStorage.removeItem(`order-pending:${id}`);
       setPending(null);
     } catch (err) {
       setError(errorText(err));
-      if (!pending && err instanceof ApiRequestError && err.status < 500) {
+      if (err instanceof ApiRequestError && err.status < 500) {
         sessionStorage.removeItem(`order-pending:${id}`);
         setPending(null);
       }
@@ -144,7 +164,7 @@ function OfferDetailContent() {
         <p role="status">Загружаем товар…</p>
       </section>
     );
-  if (!offer)
+  if (!offer && !result)
     return (
       <section className="panel onboarding">
         <h2>Товар недоступен</h2>
@@ -160,9 +180,28 @@ function OfferDetailContent() {
           Продавец свяжется с вами для согласования оплаты и получения товара.
         </p>
         <p>
-          {offer.title} · {result.quantity} шт.
+          {result.productTitle ?? offer?.title} · {result.quantity} шт.
         </p>
+        {result.totalMinor !== undefined && (
+          <p className="price">
+            Итого: {money(result.totalMinor, result.currency)}
+          </p>
+        )}
         <p>Вы ничего не оплатили через сервис.</p>
+        <p>
+          Сохраните номер заказа или сделайте снимок этого экрана — по номеру
+          продавец быстрее найдёт вашу заявку.
+        </p>
+        {result.buyerContactUsername && (
+          <p>
+            <a
+              className="button-link"
+              href={`https://t.me/${result.buyerContactUsername}`}
+            >
+              Связаться с продавцом
+            </a>
+          </p>
+        )}
         <div className="button-row">
           <button
             onClick={() => {
@@ -179,7 +218,12 @@ function OfferDetailContent() {
         </div>
       </section>
     );
-  const unavailable = !pending && (!offer.priceMinor || offer.available === 0);
+  if (!offer) return null;
+  const unavailable =
+    !pending &&
+    (!offer.priceMinor ||
+      offer.available === 0 ||
+      (offer.saleStatus && offer.saleStatus !== 'ACTIVE'));
   return (
     <section className="panel onboarding">
       {offer.imageUrl && (
@@ -192,7 +236,7 @@ function OfferDetailContent() {
       <h2>{offer.title}</h2>
       <p className="price">
         {offer.priceMinor
-          ? `${money(offer.priceMinor)} / шт.`
+          ? `${money(offer.priceMinor, offer.currency)} / шт.`
           : 'Цена уточняется'}
       </p>
       <p className="preserve-lines">{offer.description}</p>
@@ -214,7 +258,15 @@ function OfferDetailContent() {
         </p>
       )}
       {unavailable ? (
-        <p className="alert">Сейчас заявки на этот товар не принимаются.</p>
+        <p className="alert" role="status">
+          {offer.saleStatus === 'PAUSED'
+            ? 'Приём заказов временно приостановлен.'
+            : offer.saleStatus === 'ARCHIVED'
+              ? 'Продажа завершена.'
+              : offer.available === 0
+                ? 'Нет в наличии.'
+                : 'Сейчас заявки на этот товар не принимаются.'}
+        </p>
       ) : (
         <form
           className="form-stack"
@@ -249,7 +301,9 @@ function OfferDetailContent() {
           </div>
           <p className="price">
             Итого:{' '}
-            {quantityIssue ? '—' : money(offer.priceMinor! * Number(quantity))}
+            {quantityIssue
+              ? '—'
+              : money(offer.priceMinor! * Number(quantity), offer.currency)}
           </p>
           <div className="field">
             <label htmlFor="contact-type">Как с вами связаться?</label>
@@ -342,14 +396,22 @@ function OfferDetailContent() {
             продавцу для связи по заказу.
           </p>
           <div className="button-row">
-            <button disabled={busy || (!pending && !valid)}>
-              {busy
-                ? 'Отправляем…'
-                : pending
-                  ? 'Проверить отправку'
-                  : 'Отправить заказ'}
+            <button disabled={preview || busy || (!pending && !valid)}>
+              {preview
+                ? 'Предпросмотр — отправка отключена'
+                : busy
+                  ? 'Отправляем…'
+                  : pending
+                    ? 'Проверить отправку'
+                    : 'Отправить заказ'}
             </button>
           </div>
+          <p className="muted">
+            Отправляя заявку, вы принимаете{' '}
+            <Link to="/terms">условия сервиса</Link>. Контакт и данные заказа
+            будут переданы продавцу.{' '}
+            <Link to="/privacy">Как мы обрабатываем данные</Link>.
+          </p>
         </form>
       )}
     </section>
@@ -358,5 +420,23 @@ function OfferDetailContent() {
 
 export function OfferDetailPage() {
   const { id } = useParams();
-  return <OfferDetailContent key={id} />;
+  const [params] = useSearchParams();
+  const preview = params.get('preview') === '1';
+  return (
+    <>
+      {preview && (
+        <section className="panel" aria-label="Предпросмотр товара">
+          <strong>Так товар видят покупатели</strong>
+          <p>
+            Это предпросмотр. Можно заполнить форму, но заказ не будет
+            отправлен.
+          </p>
+          <Link className="button-link" to="/products">
+            ← Вернуться к товарам
+          </Link>
+        </section>
+      )}
+      <OfferDetailContent key={`${id}:${preview}`} />
+    </>
+  );
 }

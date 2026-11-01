@@ -2,6 +2,45 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import Fastify from 'fastify';
 import { randomUUID } from 'node:crypto';
+
+test('production proxy ignores forged IP headers outside trusted loopback', () => {
+  const original = process.env.TRUST_LOCAL_PROXY;
+  try {
+    process.env.TRUST_LOCAL_PROXY = '1';
+    assert.equal(
+      clientAddress({
+        ip: '127.0.0.1',
+        headers: { 'x-real-ip': '192.0.2.10' },
+      } as never),
+      '192.0.2.10',
+    );
+    assert.equal(
+      clientAddress({
+        ip: '192.0.2.20',
+        headers: { 'x-real-ip': '192.0.2.10' },
+      } as never),
+      '192.0.2.20',
+    );
+    assert.equal(
+      clientAddress({
+        ip: '127.0.0.1',
+        headers: { 'x-real-ip': 'invalid' },
+      } as never),
+      '127.0.0.1',
+    );
+    process.env.TRUST_LOCAL_PROXY = '0';
+    assert.equal(
+      clientAddress({
+        ip: '127.0.0.1',
+        headers: { 'x-real-ip': '192.0.2.10' },
+      } as never),
+      '127.0.0.1',
+    );
+  } finally {
+    if (original === undefined) delete process.env.TRUST_LOCAL_PROXY;
+    else process.env.TRUST_LOCAL_PROXY = original;
+  }
+});
 import {
   registerAbuseLimits,
   clientAddress,

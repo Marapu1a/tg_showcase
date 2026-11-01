@@ -22,6 +22,7 @@ export function OfferCreatePage() {
   const [description, setDescription] = useState(
     String(pending?.description ?? ''),
   );
+  const [currency, setCurrency] = useState(String(pending?.currency ?? 'RUB'));
   const [price, setPrice] = useState(String(pending?.price ?? ''));
   const [quantity, setQuantity] = useState(
     String(pending?.quantityLimit ?? ''),
@@ -94,15 +95,16 @@ export function OfferCreatePage() {
       title,
       description,
       price,
+      currency,
       photoId: photo?.id,
       quantityLimit: quantity ? Number(quantity) : null,
     };
-    sessionStorage.setItem('listing-pending', JSON.stringify(payload));
-    setPending(payload);
     working.current = true;
     setBusy(true);
     setError('');
     try {
+      sessionStorage.setItem('listing-pending', JSON.stringify(payload));
+      setPending(payload);
       setSaved(
         await requestJson('/listings', {
           method: 'POST',
@@ -112,7 +114,7 @@ export function OfferCreatePage() {
       sessionStorage.removeItem('listing-pending');
       setPending(null);
     } catch (err) {
-      if (!pending && err instanceof ApiRequestError && err.status < 500) {
+      if (err instanceof ApiRequestError && err.status < 500) {
         sessionStorage.removeItem('listing-pending');
         setPending(null);
       }
@@ -167,7 +169,7 @@ export function OfferCreatePage() {
             />
           )}
           <p className="price">
-            {money(Math.round(Number(price.replace(',', '.')) * 100))}
+            {money(Math.round(Number(price.replace(',', '.')) * 100), currency)}
           </p>
           <p className="preserve-lines">{description}</p>
           <p>
@@ -221,7 +223,12 @@ export function OfferCreatePage() {
                 event.target.value = '';
               }}
             />
-            <span className="muted">JPEG, PNG или WebP, до 4 МБ</span>
+            <span className="muted">JPEG, PNG или WebP, до 4 МБ.</span>
+            <span className="muted">
+              Лучше квадратное фото 1200 × 1200 px. Пропорции изображения влияют
+              на размер поста в Telegram: вытянутые фотографии могут выглядеть
+              уже.
+            </span>
             {photo && (
               <>
                 <img
@@ -255,7 +262,33 @@ export function OfferCreatePage() {
             <span className="muted">{title.length}/100</span>
           </div>
           <div className="field">
-            <label htmlFor="price">Цена за штуку, ₽</label>
+            <label htmlFor="currency">Валюта</label>
+            <select
+              id="currency"
+              value={currency}
+              disabled={busy || Boolean(pending)}
+              onChange={(e) => setCurrency(e.target.value)}
+            >
+              {Object.entries({
+                RUB: 'Российский рубль',
+                USD: 'Доллар США',
+                EUR: 'Евро',
+                INR: 'Индийская рупия',
+                GBP: 'Фунт стерлингов',
+                CNY: 'Китайский юань',
+                KZT: 'Казахстанский тенге',
+                BYN: 'Белорусский рубль',
+                UAH: 'Украинская гривна',
+                GEL: 'Грузинский лари',
+                TRY: 'Турецкая лира',
+                AED: 'Дирхам ОАЭ',
+              }).map(([code, label]) => (
+                <option key={code} value={code}>
+                  {code} — {label}
+                </option>
+              ))}
+            </select>
+            <label htmlFor="price">Цена за штуку, {currency}</label>
             <input
               id="price"
               maxLength={9}

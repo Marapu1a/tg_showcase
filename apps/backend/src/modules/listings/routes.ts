@@ -1,3 +1,7 @@
+import { currencyCode } from '../../lib/currency.js';
+import { addStock, listingStock } from './stock.js';
+import { searchListings } from './search.js';
+import { changeListingState } from './state.js';
 import { createHash } from 'node:crypto';
 import sharp from 'sharp';
 import { FastifyInstance } from 'fastify';
@@ -78,6 +82,16 @@ export async function mediaRoutes(app: FastifyInstance) {
 }
 
 export async function listingsRoutes(app: FastifyInstance) {
+  app.get('/:id/stock', async (request) =>
+    listingStock(request.seller.id, (request.params as { id: string }).id),
+  );
+  app.post('/:id/stock', async (request) =>
+    addStock(
+      request.seller.id,
+      (request.params as { id: string }).id,
+      request.body,
+    ),
+  );
   app.post(
     '/photo',
     {
@@ -110,19 +124,47 @@ export async function listingsRoutes(app: FastifyInstance) {
       return { id: image.id, url: `/media/${image.id}` };
     },
   );
-  app.get('/', async (request) => {
-    const query = request.query as { before?: string };
-    const rows = await prisma.offer.findMany({
-      where: { ownerUserId: request.seller.id },
-      include: { product: { include: { images: { take: 1 } } } },
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      take: 31,
-      ...(query.before ? { cursor: { id: query.before }, skip: 1 } : {}),
+  app.get('/', async (request) =>
+    searchListings(request.seller.id, request.query as Record<string, unknown>),
+  );
+  app.post('/:id/state', async (request) =>
+    changeListingState(
+      request.seller.id,
+      (request.params as { id: string }).id,
+      request.body,
+    ),
+  );
+  app.get('/:id', async (request) => {
+    const offer = await prisma.offer.findUnique({
+      where: {
+        id: (request.params as { id: string }).id,
+        ownerUserId: request.seller.id,
+      },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        publishState: true,
+        telegramMessageId: true,
+        product: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            priceText: true,
+            quantityLimit: true,
+            reservedQuantity: true,
+            images: {
+              take: 1,
+              orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+              select: { fileUrl: true },
+            },
+          },
+        },
+      },
     });
-    return {
-      offers: rows.slice(0, 30),
-      next: rows.length > 30 ? rows[29]!.id : null,
-    };
+    if (!offer) throw new InputError(404, 'Товар не найден.');
+    return offer;
   });
   app.post('/', async (request, reply) => {
     const p = objectBody(request.body);
@@ -130,6 +172,7 @@ export async function listingsRoutes(app: FastifyInstance) {
     const title = textField(p.title, 'Название', 100);
     const description = textField(p.description, 'Описание', 700, true) || null;
     const priceMinor = moneyMinor(p.price);
+    const currency = currencyCode(p.currency);
     const photoId = textField(p.photoId, 'Фото', 100, true) || null;
     const quantityLimit =
       p.quantityLimit === null || p.quantityLimit === undefined
@@ -152,6 +195,7 @@ export async function listingsRoutes(app: FastifyInstance) {
           title,
           description,
           priceMinor,
+          ...(currency !== 'RUB' ? { currency } : {}),
           photoId,
           quantityLimit,
         }),
@@ -194,7 +238,8 @@ export async function listingsRoutes(app: FastifyInstance) {
           title,
           description,
           priceMinor,
-          priceText: formatMoney(priceMinor),
+          currency,
+          priceText: formatMoney(priceMinor, currency),
           quantityLimit,
           ...(photoId
             ? { images: { create: { fileUrl: `/media/${photoId}` } } }

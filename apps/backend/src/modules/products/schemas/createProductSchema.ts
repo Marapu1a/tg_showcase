@@ -1,10 +1,12 @@
 import { ProductStatus } from '@prisma/client';
+import { currencyCode } from '../../../lib/currency.js';
 
 export type CreateProductBody = {
   ownerUserId: string;
   title: string;
   description?: string;
   priceText: string;
+  currency: string;
   checkoutUrl?: string;
   status?: ProductStatus;
   quantityLimit?: number | null;
@@ -34,7 +36,9 @@ export function parseCreateProductBody(body: unknown): CreateProductBody {
   }
 
   const description =
-    typeof payload.description === 'string' ? payload.description.trim() : undefined;
+    typeof payload.description === 'string'
+      ? payload.description.trim()
+      : undefined;
 
   const status =
     payload.status === undefined
@@ -51,7 +55,11 @@ export function parseCreateProductBody(body: unknown): CreateProductBody {
     title: payload.title.trim(),
     description,
     priceText: payload.priceText.trim(),
-    checkoutUrl: typeof payload.checkoutUrl === 'string' ? payload.checkoutUrl.trim() : undefined,
+    currency: currencyCode(payload.currency),
+    checkoutUrl:
+      typeof payload.checkoutUrl === 'string'
+        ? payload.checkoutUrl.trim()
+        : undefined,
     status,
     quantityLimit,
   };

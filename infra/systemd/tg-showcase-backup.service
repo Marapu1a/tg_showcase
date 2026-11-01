@@ -1,0 +1,7 @@
+[Unit]
+Description=Telegram Showcase database and payment spool backup
+
+[Service]
+Type=oneshot
+ExecStart=/opt/tg-showcase/current/infra/backup.sh
+UMask=0077

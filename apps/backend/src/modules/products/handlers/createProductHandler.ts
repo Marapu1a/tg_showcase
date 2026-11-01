@@ -1,7 +1,7 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 
 import { prisma } from '../../../lib/prisma.js';
-import { moneyMinor } from '../../../lib/input.js';
+import { moneyMinor, formatMoney } from '../../../lib/input.js';
 import { parseCreateProductBody } from '../schemas/createProductSchema.js';
 
 export async function createProductHandler(
@@ -30,7 +30,8 @@ export async function createProductHandler(
         ownerUserId: data.ownerUserId,
         title: data.title,
         description: data.description,
-        priceText: data.priceText,
+        priceText: formatMoney(moneyMinor(data.priceText), data.currency),
+        currency: data.currency,
         priceMinor: moneyMinor(data.priceText),
         checkoutUrl: data.checkoutUrl,
         status: data.status,

@@ -1,6 +1,8 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 
 import { prisma } from '../../../lib/prisma.js';
+import { changeListingState } from '../../listings/state.js';
+import { InputError } from '../../../lib/input.js';
 import { parseOfferIdParam } from '../schemas/offerParamsSchema.js';
 
 export async function deleteOfferHandler(
@@ -12,7 +14,7 @@ export async function deleteOfferHandler(
 
     const existing = await prisma.offer.findUnique({
       where: { id, ownerUserId: request.seller.id },
-      select: { id: true },
+      select: { id: true, status: true },
     });
 
     if (!existing) {
@@ -21,13 +23,15 @@ export async function deleteOfferHandler(
       });
     }
 
-    const offer = await prisma.offer.update({
-      where: { id, ownerUserId: request.seller.id },
-      data: { status: 'ARCHIVED' },
+    const offer = await changeListingState(request.seller.id, id, {
+      action: 'ARCHIVE',
+      expectedStatus: existing.status,
     });
 
     return reply.send(offer);
   } catch (error) {
+    if (error instanceof InputError)
+      return reply.code(error.statusCode).send({ message: error.message });
     const message =
       error instanceof Error ? error.message : 'Failed to delete offer';
 

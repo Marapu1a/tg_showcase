@@ -8,4 +8,7 @@ export const mainMenuKeyboard = Markup.inlineKeyboard([
     Markup.button.webApp('Заказы', `${baseUrl}/orders`),
   ],
   [Markup.button.webApp('Добавить товар', `${baseUrl}/offers/new`)],
+  ...(env.SUPPORT_URL
+    ? [[Markup.button.url('Поддержка и предложения', env.SUPPORT_URL)]]
+    : []),
 ]);

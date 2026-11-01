@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
+import { LegalPage } from './pages/LegalPage';
 
 import { AppLayout } from './components/AppLayout';
 import { BillingPage } from './pages/BillingPage';
@@ -21,6 +22,8 @@ export function App() {
         <Route path="/offers/new" element={<OfferCreatePage />} />
         <Route path="/offers/:id" element={<OfferDetailPage />} />
         <Route path="/billing" element={<BillingPage />} />
+        <Route path="/terms" element={<LegalPage />} />
+        <Route path="/privacy" element={<LegalPage privacy />} />
       </Route>
     </Routes>
   );

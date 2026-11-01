@@ -1,3 +1,4 @@
+import { registerPayments } from './handlers/payments.js';
 import { registerChannelSelection } from './handlers/channel-selection.js';
 import { Telegraf } from 'telegraf';
 
@@ -8,6 +9,7 @@ import { registerTextHandlers } from './handlers/text.js';
 import { logger } from './lib/logger.js';
 
 const bot = new Telegraf(env.BOT_TOKEN);
+registerPayments(bot);
 const recentUpdates = new Map<number, number>();
 let windowStart = 0;
 let windowCount = 0;

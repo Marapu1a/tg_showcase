@@ -20,6 +20,7 @@ export function registerSellerAuth(app: FastifyInstance, deps: Dependencies) {
   const budgets = new Map<string, { until: number; count: number }>();
   app.decorateRequest('seller');
   app.addHook('onRequest', async (request, reply) => {
+    reply.header('Cache-Control', 'private, no-store');
     const header = request.headers.authorization;
     if (!deps.token)
       return reply

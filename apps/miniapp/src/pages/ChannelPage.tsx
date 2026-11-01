@@ -1,3 +1,4 @@
+import { BuyerContactSettings } from '../components/BuyerContactSettings';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -161,125 +162,132 @@ export function ChannelPage() {
     );
 
   return (
-    <section className="panel onboarding">
-      <p className="eyebrow">{channel ? 'Ваш канал' : 'Шаг 1 · Подключение'}</p>
-      <h2>{channel ? channel.title : 'Начнём с вашего канала'}</h2>
-      {loading && <p role="status">Загружаем подключение…</p>}
-      {error && (
-        <div className="alert error" role="alert">
-          {error}
-        </div>
-      )}
-      {!loading && channel ? (
-        <>
-          <p className="connection-status">Канал подключён</p>
-          {channel.username && <p>@{channel.username}</p>}
-          <p>
-            {verified
-              ? 'Права проверены. Можно переходить к товару.'
-              : 'Подключение сохранено. Перед публикацией мы снова проверим права.'}
-          </p>
+    <>
+      <section className="panel onboarding">
+        <p className="eyebrow">
+          {channel ? 'Ваш канал' : 'Шаг 1 · Подключение'}
+        </p>
+        <h2>{channel ? channel.title : 'Начнём с вашего канала'}</h2>
+        {loading && <p role="status">Загружаем подключение…</p>}
+        {error && (
+          <div className="alert error" role="alert">
+            {error}
+          </div>
+        )}
+        {!loading && channel ? (
+          <>
+            <p className="connection-status">Канал подключён</p>
+            {channel.username && <p>@{channel.username}</p>}
+            <p>
+              {verified
+                ? 'Права проверены. Можно переходить к товару.'
+                : 'Подключение сохранено. Перед публикацией мы снова проверим права.'}
+            </p>
+            <div className="button-row">
+              <Link className="button-link" to="/offers/new">
+                Добавить товар
+              </Link>
+              <button
+                disabled={busy}
+                onClick={() => {
+                  void check();
+                }}
+              >
+                {busy ? 'Проверяем…' : 'Проверить права'}
+              </button>
+            </div>
+          </>
+        ) : (
+          !loading && (
+            <>
+              <p>
+                Выберите канал, в котором вы владелец или администратор с правом
+                публикации.
+              </p>
+              {nativePicker && (
+                <div className="button-row">
+                  <button
+                    disabled={busy || waiting}
+                    onClick={() => {
+                      void choose();
+                    }}
+                  >
+                    {busy
+                      ? 'Подготавливаем…'
+                      : 'Подключить канал через Telegram'}
+                  </button>
+                </div>
+              )}
+              {waiting && (
+                <p role="status">
+                  Проверяем выбранный канал. Подтверждение появится здесь и в
+                  боте…
+                </p>
+              )}
+              <details open={!nativePicker}>
+                <summary>Подключить по ссылке</summary>
+                <ol className="connection-steps">
+                  <li>
+                    Откройте настройки канала → «Администраторы» → «Добавить
+                    администратора».
+                  </li>
+                  <li>
+                    Добавьте {bot ? <strong>@{bot}</strong> : 'нашего бота'} и
+                    разрешите публикацию сообщений.
+                  </li>
+                  <li>Вставьте публичную ссылку или @имя канала ниже.</li>
+                </ol>
+                <form
+                  className="form-stack"
+                  onSubmit={(event) => {
+                    void submit(event);
+                  }}
+                >
+                  <div className="field">
+                    <label htmlFor="channel-reference">Ссылка на канал</label>
+                    <input
+                      id="channel-reference"
+                      value={reference}
+                      onChange={(event) => setReference(event.target.value)}
+                      placeholder="https://t.me/my_channel"
+                      maxLength={200}
+                      required
+                      disabled={busy || waiting}
+                    />
+                  </div>
+                  <div className="button-row">
+                    <button disabled={busy || waiting}>
+                      {busy ? 'Проверяем права…' : 'Проверить и подключить'}
+                    </button>
+                  </div>
+                </form>
+                {!nativePicker && (
+                  <p className="muted">
+                    Для закрытого канала обновите Telegram: подключение доступно
+                    через встроенный выбор канала.
+                  </p>
+                )}
+              </details>
+              <p className="muted">
+                Пока можно подключить один канал. Этот шаг ничего не публикует.
+              </p>
+            </>
+          )
+        )}
+        {!channel && (
           <div className="button-row">
-            <Link className="button-link" to="/offers/new">
-              Добавить товар
-            </Link>
             <button
-              disabled={busy}
+              disabled={busy || loading}
               onClick={() => {
                 void check();
               }}
             >
-              {busy ? 'Проверяем…' : 'Проверить права'}
+              Обновить статус
             </button>
           </div>
-        </>
-      ) : (
-        !loading && (
-          <>
-            <p>
-              Выберите канал, в котором вы владелец или администратор с правом
-              публикации.
-            </p>
-            {nativePicker && (
-              <div className="button-row">
-                <button
-                  disabled={busy || waiting}
-                  onClick={() => {
-                    void choose();
-                  }}
-                >
-                  {busy ? 'Подготавливаем…' : 'Подключить канал через Telegram'}
-                </button>
-              </div>
-            )}
-            {waiting && (
-              <p role="status">
-                Проверяем выбранный канал. Подтверждение появится здесь и в
-                боте…
-              </p>
-            )}
-            <details open={!nativePicker}>
-              <summary>Подключить по ссылке</summary>
-              <ol className="connection-steps">
-                <li>
-                  Откройте настройки канала → «Администраторы» → «Добавить
-                  администратора».
-                </li>
-                <li>
-                  Добавьте {bot ? <strong>@{bot}</strong> : 'нашего бота'} и
-                  разрешите публикацию сообщений.
-                </li>
-                <li>Вставьте публичную ссылку или @имя канала ниже.</li>
-              </ol>
-              <form
-                className="form-stack"
-                onSubmit={(event) => {
-                  void submit(event);
-                }}
-              >
-                <div className="field">
-                  <label htmlFor="channel-reference">Ссылка на канал</label>
-                  <input
-                    id="channel-reference"
-                    value={reference}
-                    onChange={(event) => setReference(event.target.value)}
-                    placeholder="https://t.me/my_channel"
-                    maxLength={200}
-                    required
-                    disabled={busy || waiting}
-                  />
-                </div>
-                <div className="button-row">
-                  <button disabled={busy || waiting}>
-                    {busy ? 'Проверяем права…' : 'Проверить и подключить'}
-                  </button>
-                </div>
-              </form>
-              {!nativePicker && (
-                <p className="muted">
-                  Для закрытого канала обновите Telegram: подключение доступно
-                  через встроенный выбор канала.
-                </p>
-              )}
-            </details>
-            <p className="muted">
-              Пока можно подключить один канал. Этот шаг ничего не публикует.
-            </p>
-          </>
-        )
-      )}
-      {!channel && (
-        <div className="button-row">
-          <button
-            disabled={busy || loading}
-            onClick={() => {
-              void check();
-            }}
-          >
-            Обновить статус
-          </button>
-        </div>
-      )}
-    </section>
+        )}
+      </section>
+      <BuyerContactSettings />
+    </>
   );
 }

@@ -1,3 +1,4 @@
+import { NewOrdersLink } from './NewOrdersLink';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 export function AppLayout() {
   const { pathname } = useLocation();
@@ -21,11 +22,19 @@ export function AppLayout() {
           <Link className="nav-link" to="/orders">
             Заказы
           </Link>
+          <NewOrdersLink />
+          <Link className="nav-link" to="/billing">
+            Оплата сервиса
+          </Link>
         </nav>
       )}
       <main className="page-content">
         <Outlet />
       </main>
+      <footer className="muted button-row">
+        <Link to="/terms">Условия</Link>
+        <Link to="/privacy">Обработка данных</Link>
+      </footer>
     </div>
   );
 }

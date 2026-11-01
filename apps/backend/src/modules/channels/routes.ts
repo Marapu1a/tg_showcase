@@ -1,3 +1,4 @@
+import { InputError, objectBody } from '../../lib/input.js';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { FastifyInstance } from 'fastify';
 import { prisma } from '../../lib/prisma.js';
@@ -9,6 +10,28 @@ import {
 } from './service.js';
 
 export async function channelsRoutes(app: FastifyInstance) {
+  app.get('/buyer-contact', async (request) =>
+    prisma.user.findUniqueOrThrow({
+      where: { id: request.seller.id },
+      select: { buyerContactUsername: true },
+    }),
+  );
+  app.put('/buyer-contact', async (request) => {
+    const value = objectBody(request.body).buyerContactUsername;
+    if (typeof value !== 'string' || value.length > 33)
+      throw new InputError(400, 'Введите Telegram @имя до 32 символов.');
+    const username = value.trim().replace(/^@/, '');
+    if (username && !/^[A-Za-z][A-Za-z0-9_]{3,31}$/.test(username))
+      throw new InputError(
+        400,
+        'Введите корректное Telegram @имя или оставьте поле пустым.',
+      );
+    return prisma.user.update({
+      where: { id: request.seller.id },
+      data: { buyerContactUsername: username.toLowerCase() || null },
+      select: { buyerContactUsername: true },
+    });
+  });
   app.get('/', async (request) => ({
     channel: await prisma.sellerChannel.findUnique({
       where: { ownerUserId: request.seller.id },

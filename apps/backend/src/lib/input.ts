@@ -53,19 +53,19 @@ export function moneyMinor(value: unknown) {
   if (!/^\d{1,6}(\.\d{1,2})?$/.test(price))
     throw new InputError(
       400,
-      'Укажите цену в рублях, не более двух знаков после запятой.',
+      'Укажите цену, не более двух знаков после запятой.',
     );
   const [rubles, cents = ''] = price.split('.');
   const result = Number(rubles) * 100 + Number(cents.padEnd(2, '0'));
   if (result < 1 || result > 100000000)
-    throw new InputError(400, 'Цена должна быть от 0,01 до 999 999,99 ₽.');
+    throw new InputError(400, 'Цена должна быть от 0,01 до 999 999,99.');
   return result;
 }
-export function formatMoney(minor: number) {
-  return (
-    (minor / 100).toLocaleString('ru-RU', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }) + ' ₽'
-  );
+export function formatMoney(minor: number, currency = 'RUB') {
+  return (minor / 100).toLocaleString('ru-RU', {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }

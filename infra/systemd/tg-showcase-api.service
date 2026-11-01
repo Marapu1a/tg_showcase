@@ -1,0 +1,22 @@
+[Unit]
+Description=Telegram Showcase API
+After=network.target postgresql.service
+
+[Service]
+User=tg-showcase
+Group=tg-showcase
+WorkingDirectory=/opt/tg-showcase/current/apps/backend
+EnvironmentFile=/etc/tg-showcase/backend.env
+ExecStart=/usr/bin/node dist/server.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+MemoryMax=512M
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

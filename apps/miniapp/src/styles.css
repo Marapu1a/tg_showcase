@@ -166,6 +166,192 @@ a {
 .order-card h3 {
   margin: 0;
 }
+.management {
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+}
+.search-toolbar {
+  display: grid;
+  gap: 16px;
+  margin-top: 20px;
+}
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.filter-stack {
+  display: grid;
+  gap: 12px;
+}
+.search-filters summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 8px 0;
+}
+.search-toolbar .button-row button {
+  padding: 10px 14px;
+  font-size: 0.9rem;
+}
+.compact-list {
+  display: grid;
+  gap: 0;
+  border-top: 1px solid #d6d9df;
+}
+.compact-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 4px;
+  border: 0;
+  border-bottom: 1px solid #d6d9df;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.compact-row:hover {
+  background: #f3f6fa;
+}
+.row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.row-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  max-width: 44%;
+  text-align: right;
+}
+.list-thumbnail {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: #eeece7;
+}
+.empty-thumbnail {
+  display: grid;
+  place-items: center;
+  color: #596579;
+}
+.status-pill {
+  display: inline-block;
+  border-radius: 8px;
+  padding: 3px 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: #edf0f5;
+  color: #46546b;
+}
+.status-pill.status-active,
+.status-pill.status-done {
+  background: #e1f2e5;
+  color: #246238;
+}
+.status-pill.status-paused,
+.status-pill.status-in_progress {
+  background: #fff0d2;
+  color: #845200;
+}
+.status-pill.status-new {
+  background: #e2effd;
+  color: #235b96;
+}
+.status-pill.status-cancelled,
+.status-pill.status-archived {
+  background: #f0e7ea;
+  color: #70404e;
+}
+.detail-view {
+  margin-top: 20px;
+  overflow-wrap: anywhere;
+}
+.detail-view h3 {
+  font-size: 1.4rem;
+  margin-bottom: 8px;
+}
+.workflow-form {
+  padding: 18px;
+  border: 1px solid #cbd0d8;
+  border-radius: 14px;
+  background: #fafbfc;
+}
+.workflow-form h4 {
+  margin: 0;
+}
+.checkbox-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.checkbox-field input {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  margin-top: 2px;
+}
+.order-history {
+  border-top: 1px solid #d6d9df;
+  margin-top: 28px;
+  padding-top: 4px;
+}
+.history-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 16px;
+}
+.history-list li {
+  border-left: 3px solid #cbd0d8;
+  padding-left: 12px;
+}
+.history-list p {
+  margin: 6px 0;
+}
+.status-pill.status-returned {
+  background: #f1e6fb;
+  color: #703b8d;
+}
+.pagination {
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 24px;
+}
+.button-row button.secondary {
+  background: #e8ebf0;
+  color: #14213d;
+}
+@media (max-width: 480px) {
+  .management {
+    padding: 18px 14px;
+  }
+  .compact-row {
+    gap: 10px;
+  }
+  .list-thumbnail {
+    width: 42px;
+    height: 42px;
+  }
+  .row-meta {
+    font-size: 0.88rem;
+  }
+  .pagination {
+    gap: 8px;
+  }
+  .pagination button {
+    padding: 10px 14px;
+  }
+}
 .order-card.status-new {
   border-left: 5px solid #2473bb;
 }
@@ -326,3 +512,6 @@ button {
     flex: 1 1 calc(50% - 8px);
   }
 }
+
+.stock-breakdown { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .6rem 1rem; }
+.stock-breakdown dd { margin: 0; font-weight: 700; }

@@ -12,12 +12,14 @@ const testPostText = [
 
 const testPostKeyboard = Markup.inlineKeyboard([
   Markup.button.url('Купить', 'https://example.com/pay'),
-  Markup.button.url('Подробнее', 'https://example.com/details'),
 ]);
 
 export function registerTestPostCommand(bot: Telegraf) {
   bot.command('testpost', async (ctx) => {
-    if (!ctx.from || !env.ADMIN_TELEGRAM_USER_IDS.includes(String(ctx.from.id))) {
+    if (
+      !ctx.from ||
+      !env.ADMIN_TELEGRAM_USER_IDS.includes(String(ctx.from.id))
+    ) {
       await ctx.reply('Команда доступна только администратору.');
       return;
     }

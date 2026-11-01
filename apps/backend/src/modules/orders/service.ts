@@ -1,5 +1,7 @@
+import { currencyCode } from '../../lib/currency.js';
+import { Prisma, OrderRequest } from '@prisma/client';
 import { createHash } from 'node:crypto';
-import { OrderStatus } from '@prisma/client';
+export { changeOrderStatus } from './workflow.js';
 import { serializable } from '../../lib/transaction.js';
 import {
   InputError,
@@ -8,6 +10,7 @@ import {
   textField,
 } from '../../lib/input.js';
 import { TelegramIdentity } from '../../lib/telegramAuth.js';
+import { searchableContact } from '../../lib/search.js';
 
 export function parseOrder(body: unknown, identity?: TelegramIdentity) {
   const p = objectBody(body);
@@ -56,6 +59,7 @@ export function parseOrder(body: unknown, identity?: TelegramIdentity) {
     requestKey: requestKey(p.requestKey),
     quantity,
     expectedPrice: p.unitPriceMinor,
+    expectedCurrency: currencyCode(p.currency),
     contactType: String(contactType),
     contact,
     contactVerified,
@@ -66,15 +70,39 @@ export function parseOrder(body: unknown, identity?: TelegramIdentity) {
   };
 }
 
+async function receipt(tx: Prisma.TransactionClient, order: OrderRequest) {
+  const seller = await tx.user.findUniqueOrThrow({
+    where: { id: order.ownerUserId },
+    select: { buyerContactUsername: true },
+  });
+  return {
+    id: order.id,
+    number: order.number,
+    status: order.status,
+    productTitle: order.productTitle,
+    quantity: order.quantity,
+    totalMinor: order.totalMinor,
+    currency: order.currency,
+    buyerContactUsername: seller.buyerContactUsername,
+  };
+}
+
 export async function createOrder(
   offerId: string,
   body: unknown,
   identity?: TelegramIdentity,
 ) {
   const parsed = parseOrder(body, identity);
-  const { requestKey: key, expectedPrice, ...data } = parsed;
+  const { requestKey: key, expectedPrice, expectedCurrency, ...data } = parsed;
   const fingerprint = createHash('sha256')
-    .update(JSON.stringify({ offerId, ...data, expectedPrice }))
+    .update(
+      JSON.stringify({
+        offerId,
+        ...data,
+        expectedPrice,
+        ...(expectedCurrency !== 'RUB' ? { expectedCurrency } : {}),
+      }),
+    )
     .digest('hex');
   return serializable(async (tx) => {
     const previous = await tx.orderRequest.findUnique({
@@ -86,11 +114,7 @@ export async function createOrder(
           409,
           'Эта заявка уже отправлена с другими данными. Обновите страницу для нового заказа.',
         );
-      return {
-        id: previous.id,
-        number: previous.number,
-        status: previous.status,
-      };
+      return receipt(tx, previous);
     }
     const offer = await tx.offer.findUnique({
       where: { id: offerId },
@@ -108,7 +132,10 @@ export async function createOrder(
         409,
         'Продавец ещё не указал цену для оформления заявки.',
       );
-    if (expectedPrice !== product.priceMinor)
+    if (
+      expectedPrice !== product.priceMinor ||
+      expectedCurrency !== product.currency
+    )
       throw new InputError(
         409,
         'Цена изменилась. Обновите карточку перед отправкой заказа.',
@@ -153,57 +180,18 @@ export async function createOrder(
     const order = await tx.orderRequest.create({
       data: {
         ...data,
+        contactSearch: searchableContact(data.contact, data.contactType),
         requestKey: key,
         requestFingerprint: fingerprint,
         offerId,
         ownerUserId: offer.ownerUserId,
         productId: product.id,
         productTitle: product.title,
+        currency: product.currency,
         unitPriceMinor: product.priceMinor,
         totalMinor: product.priceMinor * data.quantity,
       },
     });
-    return { id: order.id, number: order.number, status: order.status };
-  });
-}
-
-export async function changeOrderStatus(
-  ownerUserId: string,
-  id: string,
-  body: unknown,
-) {
-  const p = objectBody(body);
-  if (
-    !Object.values(OrderStatus).includes(p.status as OrderStatus) ||
-    !Object.values(OrderStatus).includes(p.expectedStatus as OrderStatus)
-  )
-    throw new InputError(400, 'Неизвестный статус заказа.');
-  return serializable(async (tx) => {
-    const order = await tx.orderRequest.findUnique({
-      where: { id, ownerUserId },
-    });
-    if (!order) throw new InputError(404, 'Заказ не найден.');
-    if (order.status === p.status)
-      return { id: order.id, status: order.status };
-    if (order.status !== p.expectedStatus)
-      throw new InputError(409, 'Статус уже изменился. Обновите список.');
-    const allowed: Record<OrderStatus, OrderStatus[]> = {
-      NEW: ['IN_PROGRESS', 'DONE', 'CANCELLED'],
-      IN_PROGRESS: ['DONE', 'CANCELLED'],
-      DONE: [],
-      CANCELLED: [],
-    };
-    if (!allowed[order.status].includes(p.status as OrderStatus))
-      throw new InputError(409, 'Этот заказ уже завершён.');
-    if (p.status === 'CANCELLED')
-      await tx.product.update({
-        where: { id: order.productId },
-        data: { reservedQuantity: { decrement: order.quantity } },
-      });
-    const updated = await tx.orderRequest.update({
-      where: { id, ownerUserId, status: order.status },
-      data: { status: p.status as OrderStatus },
-    });
-    return { id: updated.id, status: updated.status };
+    return receipt(tx, order);
   });
 }

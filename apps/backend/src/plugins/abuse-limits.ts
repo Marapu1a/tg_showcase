@@ -4,6 +4,14 @@ import rateLimit from '@fastify/rate-limit';
 import { InputError, objectBody, textField } from '../lib/input.js';
 
 export function clientAddress(request: FastifyRequest) {
+  const real = request.headers['x-real-ip'];
+  if (
+    process.env.TRUST_LOCAL_PROXY === '1' &&
+    ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(request.ip) &&
+    typeof real === 'string' &&
+    isIP(real)
+  )
+    return real;
   const forwarded = request.headers['cf-connecting-ip'];
   // Opt in only for a loopback-only server behind the local cloudflared process.
   if (
@@ -31,7 +39,7 @@ export function registerAbuseLimits(app: FastifyInstance) {
   app.addHook('onRoute', (route) => {
     if (route.config?.rateLimit !== undefined) return;
     if (
-      ['POST', 'PATCH', 'DELETE'].some((method) =>
+      ['POST', 'PUT', 'PATCH', 'DELETE'].some((method) =>
         Array.isArray(route.method)
           ? route.method.includes(method as 'POST')
           : route.method === method,

@@ -85,12 +85,67 @@ test(
         );
         return { authorization: `tma ${p}` };
       };
+      assert.equal(
+        (await app.inject({ url: '/channels/buyer-contact' })).statusCode,
+        401,
+      );
+      const settings = (id: number, value: unknown) =>
+        app.inject({
+          method: 'PUT',
+          url: '/channels/buyer-contact',
+          headers: auth(id),
+          payload: { buyerContactUsername: value },
+        });
+      assert.equal(
+        (await settings(1001, 'https://evil.example')).statusCode,
+        400,
+      );
+      assert.equal((await settings(1001, '@shop_support')).statusCode, 200);
+      assert.equal(
+        (
+          await app.inject({
+            url: '/channels/buyer-contact',
+            headers: auth(1002),
+          })
+        ).json().buyerContactUsername,
+        null,
+      );
       const duplicate = body(2);
       const first = await Promise.all([
         createOrder(offer.id, duplicate),
         createOrder(offer.id, duplicate),
       ]);
       assert.equal(first[0]!.id, first[1]!.id);
+      assert.equal(first[0]!.buyerContactUsername, 'shop_support');
+      assert.equal(first[0]!.totalMinor, 120000);
+      assert.equal(first[0]!.quantity, 2);
+      assert.equal(
+        (
+          await app.inject({ url: '/orders/new-count', headers: auth(1001) })
+        ).json().count,
+        1,
+      );
+      assert.equal(
+        (
+          await app.inject({ url: '/orders/new-count', headers: auth(1002) })
+        ).json().count,
+        0,
+      );
+      assert.equal(
+        (
+          await app.inject({
+            url: `/orders/${first[0]!.id}`,
+            headers: auth(1002),
+          })
+        ).statusCode,
+        404,
+      );
+      await settings(1001, '');
+      assert.equal(
+        (await createOrder(offer.id, duplicate)).buyerContactUsername,
+        null,
+      );
+      assert.equal((await createOrder(offer.id, duplicate)).totalMinor, 120000);
       assert.equal(await prisma.orderRequest.count(), 1);
       assert.equal(
         (await prisma.product.findUniqueOrThrow({ where: { id: product.id } }))
@@ -111,13 +166,20 @@ test(
           .reservedQuantity,
         3,
       );
+      const cancelKey = randomUUID();
       await changeOrderStatus(seller.id, first[0]!.id, {
         status: 'CANCELLED',
         expectedStatus: 'NEW',
+        expectedVersion: 0,
+        requestKey: cancelKey,
+        reason: 'Customer cancelled',
       });
       await changeOrderStatus(seller.id, first[0]!.id, {
         status: 'CANCELLED',
         expectedStatus: 'NEW',
+        expectedVersion: 0,
+        requestKey: cancelKey,
+        reason: 'Customer cancelled',
       });
       assert.equal(
         (await prisma.product.findUniqueOrThrow({ where: { id: product.id } }))
@@ -128,12 +190,17 @@ test(
         changeOrderStatus(seller.id, first[0]!.id, {
           status: 'NEW',
           expectedStatus: 'CANCELLED',
+          expectedVersion: 1,
+          requestKey: randomUUID(),
+          reason: 'Test',
         }),
       );
       await assert.rejects(() =>
         changeOrderStatus(other.id, first[0]!.id, {
           status: 'DONE',
           expectedStatus: 'NEW',
+          expectedVersion: 0,
+          requestKey: randomUUID(),
         }),
       );
       const snapshot = await createOrder(offer.id, body());
@@ -164,18 +231,27 @@ test(
       await changeOrderStatus(seller.id, snapshot.id, {
         status: 'IN_PROGRESS',
         expectedStatus: 'NEW',
+        expectedVersion: 0,
+        requestKey: randomUUID(),
       });
       await assert.rejects(
         () =>
           changeOrderStatus(seller.id, snapshot.id, {
             status: 'DONE',
             expectedStatus: 'NEW',
+            expectedVersion: 0,
+            requestKey: randomUUID(),
           }),
-        /Статус уже/,
+        (error: unknown) =>
+          error instanceof Error &&
+          'statusCode' in error &&
+          error.statusCode === 409,
       );
       await changeOrderStatus(seller.id, snapshot.id, {
         status: 'DONE',
         expectedStatus: 'IN_PROGRESS',
+        expectedVersion: 1,
+        requestKey: randomUUID(),
       });
       assert.equal((await app.inject({ url: '/orders' })).statusCode, 401);
       assert.equal(
@@ -236,6 +312,15 @@ test(
       globalThis.fetch = async (_url, init) => {
         const msg = JSON.parse(String(init?.body));
         assert.equal(msg.chat_id, '1001');
+        const link = new URL(
+          msg.reply_markup.inline_keyboard[0][0].web_app.url,
+        );
+        assert.equal(link.pathname, '/orders');
+        assert.ok(link.searchParams.get('order'));
+        assert.equal(
+          msg.reply_markup.inline_keyboard[0][0].text,
+          'Открыть заказ',
+        );
         assert.ok(msg.text.includes('заказ №'));
         sent++;
         return new Response(
@@ -366,6 +451,96 @@ test(
         429,
       );
       assert.equal(await prisma.orderRequest.count(), 4);
+      // Currency travels from the seller's form into the immutable order snapshot.
+      const listing = {
+        requestKey: randomUUID(),
+        title: 'Rupee item',
+        price: '125.50',
+        currency: 'INR',
+        quantityLimit: 10,
+      };
+      const created = await app.inject({
+        method: 'POST',
+        url: '/listings',
+        headers: auth(1004),
+        payload: listing,
+      });
+      assert.equal(created.statusCode, 201, created.body);
+      const rupeeId = created.json().id;
+      const rupeeOffer = await prisma.offer.findUniqueOrThrow({
+        where: { id: rupeeId },
+        include: { product: true },
+      });
+      assert.equal(rupeeOffer.product.currency, 'INR');
+      assert.match(rupeeOffer.product.priceText, /₹|INR/);
+      assert.equal(
+        (
+          await app.inject({
+            method: 'POST',
+            url: '/listings',
+            headers: auth(1004),
+            payload: { ...listing, currency: 'USD' },
+          })
+        ).statusCode,
+        409,
+      );
+      assert.equal(
+        (
+          await app.inject({
+            method: 'POST',
+            url: '/listings',
+            headers: auth(1004),
+            payload: {
+              ...listing,
+              requestKey: randomUUID(),
+              currency: 'INVALID',
+            },
+          })
+        ).statusCode,
+        400,
+      );
+      await prisma.offer.update({
+        where: { id: rupeeId },
+        data: { status: 'ACTIVE' },
+      });
+      assert.equal(
+        (await app.inject({ url: `/public/offers/${rupeeId}` })).json()
+          .currency,
+        'INR',
+      );
+      const rupeeRequest = {
+        ...body(2),
+        unitPriceMinor: 12550,
+        currency: 'INR',
+      };
+      await assert.rejects(() =>
+        createOrder(rupeeId, { ...rupeeRequest, currency: 'USD' }),
+      );
+      const rupeeReceipt = await createOrder(rupeeId, rupeeRequest);
+      assert.equal(rupeeReceipt.currency, 'INR');
+      assert.equal(rupeeReceipt.totalMinor, 25100);
+      await prisma.product.update({
+        where: { id: rupeeOffer.productId },
+        data: { currency: 'EUR', priceMinor: 999 },
+      });
+      assert.equal((await createOrder(rupeeId, rupeeRequest)).currency, 'INR');
+      assert.equal(
+        (
+          await prisma.orderRequest.findUniqueOrThrow({
+            where: { id: rupeeReceipt.id },
+          })
+        ).currency,
+        'INR',
+      );
+      let notified = '';
+      globalThis.fetch = async (_url, options) => {
+        notified += JSON.parse(String(options?.body)).text ?? '';
+        return new Response(
+          JSON.stringify({ ok: true, result: { message_id: 99 } }),
+        );
+      };
+      await deliverOrderNotifications();
+      assert.match(notified, /₹|INR/);
       console.log(
         'Real DB checks passed in isolated schema; no Telegram messages sent',
       );

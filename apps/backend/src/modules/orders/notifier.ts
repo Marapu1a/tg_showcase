@@ -35,7 +35,7 @@ export async function deliverOrderNotifications() {
         text: [
           `Новый заказ №${order.number}`,
           `${order.productTitle} — ${order.quantity} шт.`,
-          `Итого: ${formatMoney(order.totalMinor)}`,
+          `Итого: ${formatMoney(order.totalMinor, order.currency)}`,
           `Контакт: ${order.contact}`,
           order.buyerName ? `Покупатель: ${order.buyerName}` : '',
           order.comment ? `Комментарий: ${order.comment}` : '',
@@ -47,9 +47,9 @@ export async function deliverOrderNotifications() {
           inline_keyboard: [
             [
               {
-                text: 'Открыть заказы',
+                text: 'Открыть заказ',
                 web_app: {
-                  url: `${env.MINI_APP_PUBLIC_URL.replace(/\/$/, '')}/orders`,
+                  url: `${env.MINI_APP_PUBLIC_URL.replace(/\/$/, '')}/orders?order=${order.id}`,
                 },
               },
             ],

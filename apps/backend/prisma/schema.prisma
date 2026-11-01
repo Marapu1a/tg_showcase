@@ -16,6 +16,7 @@ enum ProductStatus {
 enum OfferStatus {
   DRAFT
   ACTIVE
+  PAUSED
   ARCHIVED
 }
 
@@ -29,6 +30,7 @@ enum OrderStatus {
   IN_PROGRESS
   DONE
   CANCELLED
+  RETURNED
 }
 
 model User {
@@ -37,6 +39,7 @@ model User {
   username       String?
   firstName      String?
   lastName       String?
+  buyerContactUsername String?
 
   products Product[]
   offers   Offer[]
@@ -67,6 +70,7 @@ model Product {
   priceText     String
   checkoutUrl   String?
   priceMinor Int?
+  currency String @default("RUB")
   reservedQuantity Int @default(0)
   status        ProductStatus @default(ACTIVE)
   quantityLimit Int?
@@ -76,6 +80,7 @@ model Product {
   offers      Offer[]
   offerEvents OfferEvent[]
   orders OrderRequest[]
+  stockAdditions StockAddition[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -118,6 +123,9 @@ model Offer {
   product   Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
   ownerUser User         @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
   events    OfferEvent[]
+  billing PublicationBill?
+  starInvoices StarInvoice[]
+  starPayments StarPayment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -126,6 +134,7 @@ model Offer {
   @@index([ownerUserId])
   @@index([status])
   @@index([publishedAt])
+  @@index([ownerUserId, createdAt, id])
 }
 
 model Media {
@@ -153,10 +162,14 @@ model OrderRequest {
   buyerName String?
   buyerTelegramUserId String?
   contact String
+  contactSearch String @default("")
   contactType String
   contactVerified Boolean @default(false)
   comment String?
   status OrderStatus @default(NEW)
+  version Int @default(0)
+  stockReleased Boolean @default(false)
+  history OrderHistory[]
   notificationState String @default("PENDING")
   notificationAttempts Int @default(0)
   notificationNextAt DateTime @default(now())
@@ -169,6 +182,22 @@ model OrderRequest {
   @@index([ownerUserId, status, createdAt])
   @@index([notificationState, notificationNextAt])
   @@index([offerId, createdAt])
+  @@index([ownerUserId, number])
+}
+
+model OrderHistory {
+  id String @id @default(cuid())
+  orderId String
+  actorUserId String
+  fromStatus OrderStatus
+  toStatus OrderStatus
+  reason String?
+  stockDelta Int @default(0)
+  requestKey String @unique
+  fingerprint String
+  createdAt DateTime @default(now())
+  order OrderRequest @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  @@index([orderId, createdAt, id])
 }
 
 model OfferEvent {
@@ -188,4 +217,58 @@ model OfferEvent {
   @@index([type])
   @@index([createdAt])
   @@index([viewerTelegramUserId])
+}
+
+model StockAddition {
+  id String @id @default(cuid())
+  productId String
+  ownerUserId String
+  quantity Int
+  note String?
+  requestKey String @unique
+  createdAt DateTime @default(now())
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  @@index([productId, createdAt])
+}
+
+model PublicationBill {
+  offerId String @id
+  ownerUserId String
+  kind String
+  state String
+  paymentId String? @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  offer Offer @relation(fields: [offerId], references: [id], onDelete: Restrict)
+  @@index([ownerUserId, kind, state])
+}
+model StarInvoice {
+  id String @id @default(cuid())
+  offerId String
+  ownerUserId String
+  telegramUserId String
+  stars Int
+  state String @default("OPEN")
+  precheckoutId String?
+  termsVersion String @default("stars-v1")
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  offer Offer @relation(fields: [offerId], references: [id], onDelete: Restrict)
+  @@index([offerId, state])
+}
+model StarPayment {
+  chargeId String @id
+  invoiceId String
+  offerId String
+  ownerUserId String
+  telegramUserId String
+  stars Int
+  state String
+  reason String?
+  createdAt DateTime @default(now())
+  refundNextAt DateTime @default(now())
+  refundAttempts Int @default(0)
+  offer Offer @relation(fields: [offerId], references: [id], onDelete: Restrict)
+  @@index([state, refundNextAt])
+  @@index([ownerUserId, createdAt])
 }

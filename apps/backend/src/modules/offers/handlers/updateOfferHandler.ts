@@ -11,6 +11,13 @@ export async function updateOfferHandler(
   try {
     const { id } = parseOfferIdParam(request.params);
     const data = parseUpdateOfferBody(request.body);
+    if (data.status !== undefined)
+      return reply
+        .code(400)
+        .send({
+          message:
+            'Меняйте состояние через действия «Приостановить», «Возобновить» или «Архивировать».',
+        });
 
     const existing = await prisma.offer.findUnique({
       where: { id, ownerUserId: request.seller.id },

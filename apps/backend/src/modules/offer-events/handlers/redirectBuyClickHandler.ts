@@ -1,3 +1,4 @@
+import { offerLinks } from '../../../lib/miniAppLinks.js';
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { OfferEventType } from '@prisma/client';
 import { env } from '../../../config/env.js';
@@ -23,8 +24,20 @@ export async function redirectBuyClickHandler(
       });
     }
 
-    if (!env.MINI_APP_PUBLIC_URL) return reply.code(503).send({message:'Страница заказа временно недоступна.'});
-    return reply.redirect(`${env.MINI_APP_PUBLIC_URL.replace(/\/$/, '')}/offers/${offerId}`, 302);
+    const native = await offerLinks(offerId);
+    if (native)
+      return reply.redirect(
+        native.buy.replace('startapp=buy_', 'startapp=offer_'),
+        302,
+      );
+    if (!env.MINI_APP_PUBLIC_URL)
+      return reply
+        .code(503)
+        .send({ message: 'Страница заказа временно недоступна.' });
+    return reply.redirect(
+      `${env.MINI_APP_PUBLIC_URL.replace(/\/$/, '')}/offers/${offerId}`,
+      302,
+    );
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Failed to redirect BUY click';

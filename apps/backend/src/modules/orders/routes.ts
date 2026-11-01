@@ -1,15 +1,25 @@
+import { searchOrders } from './search.js';
 import { FastifyInstance } from 'fastify';
 import { prisma } from '../../lib/prisma.js';
 import { env } from '../../config/env.js';
 import { InputError } from '../../lib/input.js';
 import { validateTelegramInitData } from '../../lib/telegramAuth.js';
 import { changeOrderStatus, createOrder } from './service.js';
+import { queryText } from '../../lib/search.js';
 
 export async function publicOrdersRoutes(app: FastifyInstance) {
   app.get('/public/offers/:id', async (request) => {
     const { id } = request.params as { id: string };
     const offer = await prisma.offer.findUnique({
-      where: { id, status: 'ACTIVE', product: { status: 'ACTIVE' } },
+      where: {
+        id,
+        product: { status: 'ACTIVE' },
+        OR: [
+          { status: 'ACTIVE' },
+          { status: 'PAUSED' },
+          { status: 'ARCHIVED', telegramMessageId: { not: null } },
+        ],
+      },
       include: {
         product: {
           include: { images: { orderBy: { sortOrder: 'asc' }, take: 1 } },
@@ -20,10 +30,11 @@ export async function publicOrdersRoutes(app: FastifyInstance) {
       throw new InputError(404, 'Продажа недоступна или уже завершена.');
     return {
       id: offer.id,
+      saleStatus: offer.status,
       title: offer.product.title,
       description: offer.product.description,
       priceMinor: offer.product.priceMinor,
-      currency: 'RUB',
+      currency: offer.product.currency,
       imageUrl: offer.product.images[0]?.fileUrl ?? null,
       available:
         offer.product.quantityLimit === null
@@ -75,45 +86,82 @@ const orderSelect = {
   contactVerified: true,
   comment: true,
   status: true,
+  version: true,
+  stockReleased: true,
   createdAt: true,
   notificationState: true,
 } as const;
 
 export async function sellerOrdersRoutes(app: FastifyInstance) {
-  app.get('/', async (request) => {
-    const query = request.query as { scope?: string; before?: string };
-    const scope = query.scope ?? 'active';
-    if (!['active', 'history', 'all'].includes(scope))
-      throw new InputError(400, 'Неизвестный фильтр.');
-    const before =
-      query.before === undefined ? undefined : Number(query.before);
-    if (before !== undefined && (!Number.isSafeInteger(before) || before < 1))
-      throw new InputError(400, 'Некорректная страница.');
-    const rows = await prisma.orderRequest.findMany({
-      where: {
-        ownerUserId: request.seller.id,
-        status:
-          scope === 'active'
-            ? { in: ['NEW', 'IN_PROGRESS'] }
-            : scope === 'history'
-              ? { in: ['DONE', 'CANCELLED'] }
-              : undefined,
-        number: before ? { lt: before } : undefined,
-      },
-      orderBy: { number: 'desc' },
-      take: 31,
-      select: orderSelect,
+  app.get('/new-count', async (request) => ({
+    count: await prisma.orderRequest.count({
+      where: { ownerUserId: request.seller.id, status: 'NEW' },
+    }),
+  }));
+  app.get('/:id/history', async (request) => {
+    const id = (request.params as { id: string }).id;
+    const order = await prisma.orderRequest.findUnique({
+      where: { id, ownerUserId: request.seller.id },
+      select: { id: true },
     });
-    const counts = await prisma.orderRequest.groupBy({
-      by: ['status'],
-      where: { ownerUserId: request.seller.id },
-      _count: true,
+    if (!order) throw new InputError(404, 'Заказ не найден.');
+    const before = queryText(
+      (request.query as { before?: unknown }).before,
+      'Страница',
+    );
+    let older = {};
+    if (before) {
+      const cursor = await prisma.orderHistory.findUnique({
+        where: { id: before, orderId: id },
+        select: { id: true, createdAt: true },
+      });
+      if (!cursor) throw new InputError(400, 'Некорректная страница истории.');
+      older = {
+        OR: [
+          { createdAt: { lt: cursor.createdAt } },
+          { createdAt: cursor.createdAt, id: { lt: cursor.id } },
+        ],
+      };
+    }
+    const rows = await prisma.orderHistory.findMany({
+      where: { orderId: id, ...older },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: 21,
+      select: {
+        id: true,
+        fromStatus: true,
+        toStatus: true,
+        reason: true,
+        stockDelta: true,
+        createdAt: true,
+      },
     });
     return {
-      orders: rows.slice(0, 30),
-      next: rows.length > 30 ? rows[29]!.number : null,
-      counts: Object.fromEntries(counts.map((row) => [row.status, row._count])),
+      events: rows.slice(0, 20),
+      next: rows.length > 20 ? rows[19]!.id : null,
     };
+  });
+  app.get('/', async (request) =>
+    searchOrders(request.seller.id, request.query as Record<string, unknown>),
+  );
+  app.get('/products', async (request) => ({
+    products: await prisma.product.findMany({
+      where: { ownerUserId: request.seller.id },
+      select: { id: true, title: true },
+      orderBy: { title: 'asc' },
+      take: 200,
+    }),
+  }));
+  app.get('/:id', async (request) => {
+    const order = await prisma.orderRequest.findUnique({
+      where: {
+        id: (request.params as { id: string }).id,
+        ownerUserId: request.seller.id,
+      },
+      select: orderSelect,
+    });
+    if (!order) throw new InputError(404, 'Заказ не найден.');
+    return order;
   });
   app.patch('/:id', async (request) =>
     changeOrderStatus(

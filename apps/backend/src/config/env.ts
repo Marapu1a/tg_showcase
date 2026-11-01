@@ -31,7 +31,19 @@ function getNodeEnv(): 'development' | 'production' | 'test' {
   return value;
 }
 
+const starsPrice = Number(process.env.PUBLICATION_PRICE_STARS ?? 30);
+const billingExemptIds = (process.env.BILLING_EXEMPT_TELEGRAM_IDS ?? '')
+  .split(',')
+  .map((id) => id.trim())
+  .filter(Boolean);
+if (billingExemptIds.some((id) => !/^[1-9]\d*$/.test(id)))
+  throw new Error('Invalid BILLING_EXEMPT_TELEGRAM_IDS');
+if (!Number.isSafeInteger(starsPrice) || starsPrice < 1 || starsPrice > 10000)
+  throw new Error('Invalid PUBLICATION_PRICE_STARS');
 export const env = {
+  BILLING_EXEMPT_TELEGRAM_IDS: billingExemptIds,
+  STARS_BILLING_ENABLED: process.env.STARS_BILLING_ENABLED === '1',
+  PUBLICATION_PRICE_STARS: starsPrice,
   HOST: process.env.HOST ?? '0.0.0.0',
   PORT: Number(process.env.PORT ?? 3000),
   DATABASE_URL: getRequiredEnv('DATABASE_URL'),

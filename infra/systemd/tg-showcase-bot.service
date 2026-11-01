@@ -1,0 +1,23 @@
+[Unit]
+Description=Telegram Showcase bot
+After=network-online.target tg-showcase-api.service
+Wants=network-online.target
+
+[Service]
+User=tg-showcase
+Group=tg-showcase
+WorkingDirectory=/opt/tg-showcase/current/apps/bot
+EnvironmentFile=/etc/tg-showcase/bot.env
+ExecStart=/usr/bin/node dist/bot.js
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/tg-showcase
+MemoryMax=256M
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

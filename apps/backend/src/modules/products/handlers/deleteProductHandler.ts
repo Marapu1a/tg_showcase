@@ -21,12 +21,12 @@ export async function deleteProductHandler(
       });
     }
 
-    const product = await prisma.product.update({
-      where: { id, ownerUserId: request.seller.id },
-      data: { status: 'ARCHIVED' },
-    });
-
-    return reply.send(product);
+    return reply
+      .code(410)
+      .send({
+        message:
+          'Архивируйте товар через карточку в каталоге. Заказы и история сохранятся.',
+      });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Failed to delete product';

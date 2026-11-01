@@ -69,23 +69,14 @@ async function callTelegramApi(
 export async function publishTelegramMessage(
   input: TelegramPublishInput,
 ): Promise<TelegramSendMessageResult> {
-  const [primary, secondary] = input.buttons;
-
-  if (!primary || !secondary) {
-    throw new Error('Two buttons are required');
-  }
+  if (!input.buttons.length) throw new Error('At least one button is required');
 
   return callTelegramApi(input.botToken, 'sendMessage', {
     chat_id: input.channelId,
     text: input.text,
     parse_mode: input.parseMode,
     reply_markup: {
-      inline_keyboard: [
-        [
-          { text: primary.text, url: primary.url },
-          { text: secondary.text, url: secondary.url },
-        ],
-      ],
+      inline_keyboard: [input.buttons.map(({ text, url }) => ({ text, url }))],
     },
   });
 }
@@ -93,11 +84,7 @@ export async function publishTelegramMessage(
 export async function publishTelegramPhoto(
   input: TelegramPublishPhotoInput,
 ): Promise<TelegramSendMessageResult> {
-  const [primary, secondary] = input.buttons;
-
-  if (!primary || !secondary) {
-    throw new Error('Two buttons are required');
-  }
+  if (!input.buttons.length) throw new Error('At least one button is required');
 
   return callTelegramApi(input.botToken, 'sendPhoto', {
     chat_id: input.channelId,
@@ -105,12 +92,7 @@ export async function publishTelegramPhoto(
     caption: input.text,
     parse_mode: input.parseMode,
     reply_markup: {
-      inline_keyboard: [
-        [
-          { text: primary.text, url: primary.url },
-          { text: secondary.text, url: secondary.url },
-        ],
-      ],
+      inline_keyboard: [input.buttons.map(({ text, url }) => ({ text, url }))],
     },
   });
 }

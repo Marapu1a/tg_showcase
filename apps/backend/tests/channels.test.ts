@@ -138,7 +138,8 @@ test('channel connection, native handoff, persistence and publish recheck', asyn
     const body = JSON.parse(String(init?.body ?? '{}'));
     if (failing) throw new Error('secret token must never leak');
     let result: unknown;
-    if (method === 'getMe') result = { id: 123, username: 'test_bot' };
+    if (method === 'getMe')
+      result = { id: 123, username: 'test_bot', has_main_web_app: true };
     else if (method === 'getChat')
       result = {
         id: body.chat_id === '@other_channel' ? -1007654321 : -1001234567,
@@ -268,6 +269,13 @@ test('channel connection, native handoff, persistence and publish recheck', asyn
     assert.equal(sent.length, 1);
     assert.equal(sent[0].chat_id, '-1001234567');
     assert.equal(sent[0].parse_mode, 'HTML');
+    const keyboard = sent[0].reply_markup as {
+      inline_keyboard: { url: string }[][];
+    };
+    assert.deepEqual(
+      keyboard.inline_keyboard.flat().map((button) => button.url),
+      ['https://t.me/test_bot?startapp=buy_offer'],
+    );
     assert.ok(
       String(sent[0].text).startsWith('<b>Product &lt;test&gt; &amp; more</b>'),
     );

@@ -1,3 +1,8 @@
+import {
+  billingRoutes,
+  internalBillingRoutes,
+} from './modules/billing/routes.js';
+import { startBillingWorker } from './modules/billing/worker.js';
 import Fastify from 'fastify';
 import { registerAbuseLimits } from './plugins/abuse-limits.js';
 import { listingsRoutes, mediaRoutes } from './modules/listings/routes.js';
@@ -25,14 +30,32 @@ import { usersRoutes } from './modules/users/routes.js';
 
 export function buildApp(options: { notifications?: boolean } = {}) {
   if (
-    process.env.TRUST_LOCAL_CLOUDFLARE === '1' &&
+    (process.env.TRUST_LOCAL_CLOUDFLARE === '1' ||
+      process.env.TRUST_LOCAL_PROXY === '1') &&
     !['127.0.0.1', '::1', 'localhost'].includes(env.HOST)
   )
     throw new Error('TRUST_LOCAL_CLOUDFLARE requires a loopback-only HOST');
   const app = Fastify({
     bodyLimit: 16384,
     requestTimeout: 20000,
-    logger: { redact: ['req.headers.authorization'] },
+    logger: {
+      redact: ['req.headers.authorization'],
+      serializers: {
+        req(request: {
+          method?: string;
+          url?: string;
+          hostname?: string;
+          ip?: string;
+        }) {
+          return {
+            method: request.method,
+            url: request.url?.split('?')[0],
+            hostname: request.hostname,
+            remoteAddress: request.ip,
+          };
+        },
+      },
+    },
   });
 
   registerCors(app);
@@ -51,6 +74,7 @@ export function buildApp(options: { notifications?: boolean } = {}) {
           update: identity,
         }),
     });
+    sellerApp.register(billingRoutes, { prefix: '/billing' });
     sellerApp.register(listingsRoutes, { prefix: '/listings' });
     sellerApp.register(sellerOrdersRoutes, { prefix: '/orders' });
     sellerApp.register(channelsRoutes, { prefix: '/channels' });
@@ -62,12 +86,16 @@ export function buildApp(options: { notifications?: boolean } = {}) {
   app.register(publicOrdersRoutes);
   app.register(mediaRoutes);
   app.register(channelHandoffRoutes);
+  app.register(internalBillingRoutes);
 
   app.addHook('onClose', async () => {
     await prisma.$disconnect();
   });
 
-  if (options.notifications) startOrderNotifier(app);
+  if (options.notifications) {
+    startOrderNotifier(app);
+    startBillingWorker(app);
+  }
   return app;
 }
 

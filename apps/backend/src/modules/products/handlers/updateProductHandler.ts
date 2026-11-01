@@ -1,7 +1,7 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 
 import { prisma } from '../../../lib/prisma.js';
-import { moneyMinor } from '../../../lib/input.js';
+import { moneyMinor, formatMoney } from '../../../lib/input.js';
 import { parseProductIdParam } from '../schemas/productParamsSchema.js';
 import { parseUpdateProductBody } from '../schemas/updateProductSchema.js';
 
@@ -15,7 +15,7 @@ export async function updateProductHandler(
 
     const existing = await prisma.product.findUnique({
       where: { id, ownerUserId: request.seller.id },
-      select: { id: true },
+      select: { id: true, currency: true },
     });
 
     if (!existing) {
@@ -24,9 +24,33 @@ export async function updateProductHandler(
       });
     }
 
+    if (data.quantityLimit !== undefined || data.status !== undefined) {
+      return reply.code(409).send({
+        message:
+          'Меняйте остаток через пополнение, а состояние продаж — в карточке товара.',
+      });
+    }
+
     const product = await prisma.product.update({
-      where: { id, ownerUserId: request.seller.id, ...(typeof data.quantityLimit === 'number' ? {reservedQuantity:{lte:data.quantityLimit}} : {}) },
-      data: {...data,...(data.priceText !== undefined ? {priceMinor:moneyMinor(data.priceText)} : {})},
+      where: {
+        id,
+        ownerUserId: request.seller.id,
+        ...(typeof data.quantityLimit === 'number'
+          ? { reservedQuantity: { lte: data.quantityLimit } }
+          : {}),
+      },
+      data: {
+        ...data,
+        ...(data.priceText !== undefined
+          ? {
+              priceMinor: moneyMinor(data.priceText),
+              priceText: formatMoney(
+                moneyMinor(data.priceText),
+                existing.currency,
+              ),
+            }
+          : {}),
+      },
     });
 
     return reply.send(product);

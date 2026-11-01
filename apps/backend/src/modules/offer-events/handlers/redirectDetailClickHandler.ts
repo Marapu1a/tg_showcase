@@ -1,3 +1,4 @@
+import { offerLinks } from '../../../lib/miniAppLinks.js';
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { OfferEventType } from '@prisma/client';
 
@@ -32,12 +33,17 @@ export async function redirectDetailClickHandler(
       });
     }
 
-    const detailUrl = buildDetailUrl(offerId);
+    const native = await offerLinks(offerId);
+    const detailUrl =
+      native?.detail.replace('startapp=detail_', 'startapp=offer_') ??
+      buildDetailUrl(offerId);
 
     return reply.redirect(detailUrl, 302);
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : 'Failed to redirect DETAIL click';
+      error instanceof Error
+        ? error.message
+        : 'Failed to redirect DETAIL click';
 
     return reply.code(400).send({
       message,

@@ -1,3 +1,6 @@
+import { claimPublication, finishPublication } from '../../billing/service.js';
+import { InputError } from '../../../lib/input.js';
+import { offerLinks } from '../../../lib/miniAppLinks.js';
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { verifiedPublishChannel } from '../../channels/service.js';
 import { ChannelError } from '../../../lib/telegramChannels.js';
@@ -13,7 +16,10 @@ import {
 import { parseOfferIdParam } from '../schemas/offerParamsSchema.js';
 
 function escapeHtml(value: string) {
-  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
 function buildOfferText(
@@ -111,14 +117,13 @@ export async function publishOfferHandler(
       request.seller.telegramUserId,
     );
 
-    const buyUrl = buildPublicUrl(
-      env.BACKEND_PUBLIC_URL,
-      `/click/buy/${offer.id}`,
-    );
-    const detailUrl = buildPublicUrl(
-      env.BACKEND_PUBLIC_URL,
-      `/click/detail/${offer.id}`,
-    );
+    const native = await offerLinks(offer.id);
+    if (!native)
+      return reply.code(409).send({
+        message:
+          'Сначала включите Main Mini App у бота в BotFather. Это нужно для открытия товара внутри Telegram.',
+      });
+    const buyUrl = native.buy;
 
     const text = buildOfferText(offer, offer.product);
 
@@ -126,28 +131,27 @@ export async function publishOfferHandler(
       offer.product.images.find((image) => image.fileUrl?.trim().length > 0)
         ?.fileUrl ?? null;
 
-    const buttons = [
-      { text: 'Купить', url: buyUrl },
-      { text: 'Подробнее', url: detailUrl },
-    ];
+    const buttons = [{ text: 'Купить', url: buyUrl }];
 
-    const claimed = await prisma.offer.updateMany({
-      where: {
-        id: offer.id,
-        ownerUserId: request.seller.id,
-        telegramMessageId: null,
-        publishState: 'IDLE',
-        status: { not: 'ARCHIVED' },
-      },
-      data: { publishState: 'SENDING' },
-    });
-    if (!claimed.count)
-      return reply
-        .code(409)
-        .send({
+    if (env.STARS_BILLING_ENABLED)
+      await claimPublication(request.seller.id, offer.id);
+    else {
+      const claimed = await prisma.offer.updateMany({
+        where: {
+          id: offer.id,
+          ownerUserId: request.seller.id,
+          telegramMessageId: null,
+          publishState: 'IDLE',
+          status: { not: 'ARCHIVED' },
+        },
+        data: { publishState: 'SENDING' },
+      });
+      if (!claimed.count)
+        return reply.code(409).send({
           message:
             'Публикация уже запущена или её результат требует проверки. Проверьте канал перед повтором.',
         });
+    }
     claimedId = offer.id;
 
     const publishResult = imageUrl
@@ -169,33 +173,38 @@ export async function publishOfferHandler(
           buttons,
         });
 
-    const updatedOffer = await prisma.offer.update({
-      where: { id, ownerUserId: request.seller.id },
-      data: {
-        status: OfferStatus.ACTIVE,
-        publishState: 'SENT',
-        channelId: publishResult.channelId,
-        telegramMessageId: publishResult.messageId,
-        publishedAt: offer.publishedAt ?? new Date(),
-      },
-    });
+    const updatedOffer = env.STARS_BILLING_ENABLED
+      ? await finishPublication(id, 'SENT', publishResult)
+      : await prisma.offer.update({
+          where: { id, ownerUserId: request.seller.id },
+          data: {
+            status: OfferStatus.ACTIVE,
+            publishState: 'SENT',
+            channelId: publishResult.channelId,
+            telegramMessageId: publishResult.messageId,
+            publishedAt: offer.publishedAt ?? new Date(),
+          },
+        });
 
     return reply.send(updatedOffer);
   } catch (error) {
     if (claimedId) {
       const rejected = error instanceof TelegramPublishRejected;
-      await prisma.offer.updateMany({
-        where: { id: claimedId, publishState: 'SENDING' },
-        data: { publishState: rejected ? 'IDLE' : 'UNCERTAIN' },
-      });
-      return reply
-        .code(rejected ? 400 : 409)
-        .send({
-          message: rejected
-            ? `Telegram отклонил публикацию: ${error.message}`
-            : 'Не удалось подтвердить результат отправки. Проверьте канал; автоматический повтор остановлен, чтобы не создать второй пост.',
+      if (env.STARS_BILLING_ENABLED)
+        await finishPublication(claimedId, rejected ? 'REJECTED' : 'UNCERTAIN');
+      else
+        await prisma.offer.updateMany({
+          where: { id: claimedId, publishState: 'SENDING' },
+          data: { publishState: rejected ? 'IDLE' : 'UNCERTAIN' },
         });
+      return reply.code(rejected ? 400 : 409).send({
+        message: rejected
+          ? `Telegram отклонил публикацию: ${error.message}`
+          : 'Не удалось подтвердить результат отправки. Проверьте канал; автоматический повтор остановлен, чтобы не создать второй пост.',
+      });
     }
+    if (error instanceof InputError)
+      return reply.code(error.statusCode).send({ message: error.message });
     if (error instanceof ChannelError)
       return reply.code(error.statusCode).send({ message: error.message });
     const message =
