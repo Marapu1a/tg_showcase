@@ -225,7 +225,7 @@ function OfferDetailContent() {
       offer.available === 0 ||
       (offer.saleStatus && offer.saleStatus !== 'ACTIVE'));
   return (
-    <section className="panel onboarding">
+    <section className="panel onboarding buyer-card">
       {offer.imageUrl && (
         <img
           className="product-photo"
@@ -239,8 +239,10 @@ function OfferDetailContent() {
           ? `${money(offer.priceMinor, offer.currency)} / шт.`
           : 'Цена уточняется'}
       </p>
+      {offer.available !== null && (
+        <p className="availability">Доступно: {offer.available} шт.</p>
+      )}
       <p className="preserve-lines">{offer.description}</p>
-      {offer.available !== null && <p>Доступно: {offer.available} шт.</p>}
       {error && (
         <div className="alert error" role="alert">
           {error}
@@ -299,7 +301,7 @@ function OfferDetailContent() {
               {quantityIssue || `От 1 до ${maxQuantity} шт. на заявку.`}
             </span>
           </div>
-          <p className="price">
+          <p className="price order-total">
             Итого:{' '}
             {quantityIssue
               ? '—'
@@ -391,19 +393,18 @@ function OfferDetailContent() {
           <div className="alert">
             Сейчас платить не нужно. Оплату и получение согласуете с продавцом.
           </div>
-          <p className="muted">
-            Отправляя заявку, вы передаёте указанный контакт и комментарий
-            продавцу для связи по заказу.
-          </p>
-          <div className="button-row">
-            <button disabled={preview || busy || (!pending && !valid)}>
+          <div className="button-row request-actions">
+            <button
+              className="request-action"
+              disabled={preview || busy || (!pending && !valid)}
+            >
               {preview
                 ? 'Предпросмотр — отправка отключена'
                 : busy
                   ? 'Отправляем…'
                   : pending
                     ? 'Проверить отправку'
-                    : 'Отправить заказ'}
+                    : 'Оставить заявку'}
             </button>
           </div>
           <p className="muted">

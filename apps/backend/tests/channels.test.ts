@@ -270,8 +270,13 @@ test('channel connection, native handoff, persistence and publish recheck', asyn
     assert.equal(sent[0].chat_id, '-1001234567');
     assert.equal(sent[0].parse_mode, 'HTML');
     const keyboard = sent[0].reply_markup as {
-      inline_keyboard: { url: string }[][];
+      inline_keyboard: { url: string; text: string }[][];
     };
+    assert.deepEqual(
+      keyboard.inline_keyboard.flat().map((button) => button.text),
+      ['Оставить заявку'],
+    );
+    assert.ok(String(sent[0].text).includes('<b>Цена: 10</b>'));
     assert.deepEqual(
       keyboard.inline_keyboard.flat().map((button) => button.url),
       ['https://t.me/test_bot?startapp=buy_offer'],

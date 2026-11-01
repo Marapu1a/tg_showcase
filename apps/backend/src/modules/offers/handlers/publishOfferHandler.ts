@@ -32,7 +32,7 @@ function buildOfferText(
     lines.push('', escapeHtml(offer.text.trim()));
   }
 
-  lines.push('', `Цена: <b>${escapeHtml(product.priceText)}</b>`);
+  lines.push('', `<b>Цена: ${escapeHtml(product.priceText)}</b>`);
 
   return lines.join('\n');
 }
@@ -131,7 +131,7 @@ export async function publishOfferHandler(
       offer.product.images.find((image) => image.fileUrl?.trim().length > 0)
         ?.fileUrl ?? null;
 
-    const buttons = [{ text: 'Купить', url: buyUrl }];
+    const buttons = [{ text: 'Оставить заявку', url: buyUrl }];
 
     if (env.STARS_BILLING_ENABLED)
       await claimPublication(request.seller.id, offer.id);

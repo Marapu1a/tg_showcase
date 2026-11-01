@@ -84,7 +84,7 @@ function ProductDetails({
   return (
     <section className="detail-view" aria-label="Подробности товара">
       <div className="button-row">
-        <button disabled={busy} onClick={onClose}>
+        <button className="secondary" disabled={busy} onClick={onClose}>
           ← К списку товаров
         </button>
       </div>
@@ -231,7 +231,7 @@ export function ProductsPage() {
               Добавить товар
             </Link>
           </p>
-          <div className="search-toolbar">
+          <div className="search-toolbar product-search">
             <div className="field">
               <label htmlFor="products-search">Найти товар</label>
               <input
@@ -257,7 +257,7 @@ export function ProductsPage() {
                 value={scope}
                 onChange={(e) => change({ scope: e.target.value })}
               >
-                <option value="current">Все, кроме архива</option>
+                <option value="current">Без архива</option>
                 <option value="all">Все товары</option>
                 {Object.entries(names).map(([value, label]) => (
                   <option key={value} value={value}>
@@ -317,7 +317,7 @@ export function ProductsPage() {
                 )}
                 <span className="row-main">
                   <strong>{row.product.title}</strong>
-                  <span>{row.product.priceText}</span>
+                  <span className="row-price">{row.product.priceText}</span>
                 </span>
                 <span className="row-meta">
                   <span

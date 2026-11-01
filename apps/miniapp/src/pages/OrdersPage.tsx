@@ -25,7 +25,9 @@ function OrderDetails({
   return (
     <section className="detail-view" aria-label="Подробности заказа">
       <div className="button-row">
-        <button onClick={onClose}>← К списку заказов</button>
+        <button className="secondary" onClick={onClose}>
+          ← К списку заказов
+        </button>
       </div>
       {loading && <p role="status">Загружаем заказ…</p>}
       {error && (

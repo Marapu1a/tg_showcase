@@ -14,6 +14,10 @@ declare global {
           };
         };
         ready?: () => void;
+        colorScheme?: 'light' | 'dark';
+        themeParams?: Record<string, string>;
+        onEvent?: (event: 'themeChanged', callback: () => void) => void;
+        offEvent?: (event: 'themeChanged', callback: () => void) => void;
         openInvoice?: (
           url: string,
           callback: (

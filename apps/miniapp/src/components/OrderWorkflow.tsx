@@ -230,7 +230,13 @@ export function OrderWorkflow({
                 <button
                   key={action.status}
                   disabled={busy}
-                  className={action.danger ? 'danger' : undefined}
+                  className={
+                    action.danger
+                      ? 'danger'
+                      : action.reason
+                        ? 'secondary'
+                        : undefined
+                  }
                   onClick={() => {
                     setError('');
                     if (action.reason) {

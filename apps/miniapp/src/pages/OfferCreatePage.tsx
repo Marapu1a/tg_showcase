@@ -161,17 +161,22 @@ export function OfferCreatePage() {
       )}
       {saved ? (
         <>
-          {photo && (
-            <img
-              className="product-photo"
-              src={assetUrl(photo.url)}
-              alt={title}
-            />
-          )}
-          <p className="price">
-            {money(Math.round(Number(price.replace(',', '.')) * 100), currency)}
-          </p>
-          <p className="preserve-lines">{description}</p>
+          <div className="post-preview">
+            {photo && (
+              <img
+                className="product-photo"
+                src={assetUrl(photo.url)}
+                alt={title}
+              />
+            )}
+            <p className="price">
+              {money(
+                Math.round(Number(price.replace(',', '.')) * 100),
+                currency,
+              )}
+            </p>
+            <p className="preserve-lines">{description}</p>
+          </div>
           <p>
             Покупатель оставит заявку. Оплату и получение вы согласуете лично.
           </p>
