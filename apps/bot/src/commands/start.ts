@@ -3,6 +3,24 @@ import { Telegraf, Markup } from 'telegraf';
 import { mainMenuKeyboard } from '../keyboards/main-menu.js';
 
 export function registerStartCommand(bot: Telegraf) {
+  bot.command('admin', async (ctx) => {
+    if (
+      !ctx.from ||
+      !env.ADMIN_TELEGRAM_USER_IDS.includes(String(ctx.from.id))
+    ) {
+      await ctx.reply('Этот раздел доступен только владельцу TG Zoo.');
+      return;
+    }
+    await ctx.reply(
+      'Управление TG Zoo',
+      Markup.inlineKeyboard([
+        Markup.button.webApp(
+          'Открыть панель',
+          `${env.MINI_APP_PUBLIC_URL.replace(/\/$/, '')}/admin`,
+        ),
+      ]),
+    );
+  });
   bot.command(['support', 'paysupport'], async (ctx) => {
     await ctx.reply(
       'По вопросам оплаты, возврата, ошибок и предложений напишите нам. Укажите товар и дату оплаты. Telegram не рассматривает обращения по нашему сервису.',

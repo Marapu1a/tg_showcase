@@ -58,6 +58,91 @@
 * {
   box-sizing: border-box;
 }
+
+.hub-hero {
+  max-width: 720px;
+  padding: 32px 0;
+}
+.hub-hero h2 {
+  font-size: clamp(2rem, 6vw, 3rem);
+  margin: 12px 0 20px;
+  line-height: 1.15;
+}
+.hub-hero > p:last-child {
+  max-width: 560px;
+  color: var(--muted);
+  font-size: 1.0625rem;
+}
+.hub-projects {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  gap: 16px;
+}
+.hub-project {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.hub-project p {
+  margin: 0;
+  flex: 1;
+}
+.project-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.project-monogram {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: var(--selected);
+  color: var(--link);
+  font-weight: 700;
+}
+.owner-tabs {
+  margin: 24px 0;
+}
+.owner-toolbar {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.owner-toolbar .field {
+  flex: 1;
+}
+.owner-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.owner-metric {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--subtle);
+}
+.owner-metric strong {
+  font-size: 1.75rem;
+  font-variant-numeric: tabular-nums;
+}
+.owner-balance {
+  border-top: 1px solid var(--border);
+  margin-top: 24px;
+}
+.owner-id {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+.owner-project-list {
+  margin-top: 16px;
+}
 body {
   margin: 0;
   min-width: 320px;

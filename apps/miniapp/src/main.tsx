@@ -12,6 +12,9 @@ const launch =
   window.Telegram?.WebApp?.initDataUnsafe?.start_param ??
   new URLSearchParams(window.location.search).get('tgWebAppStartParam');
 const target = launch?.match(/^(buy|detail|offer)_([a-zA-Z0-9-]{1,100})$/);
+if (launch === 'admin' && window.location.pathname === '/') {
+  window.history.replaceState(null, '', '/admin');
+}
 if (target && window.location.pathname === '/') {
   window.history.replaceState(null, '', `/offers/${target[2]}`);
   if (target[1] !== 'offer') {

@@ -32,6 +32,12 @@ function getNodeEnv(): 'development' | 'production' | 'test' {
 }
 
 const starsPrice = Number(process.env.PUBLICATION_PRICE_STARS ?? 30);
+const ownerIds = (process.env.OWNER_TELEGRAM_IDS ?? '')
+  .split(',')
+  .map((id) => id.trim())
+  .filter(Boolean);
+if (ownerIds.some((id) => !/^[1-9]\d*$/.test(id)))
+  throw new Error('Invalid OWNER_TELEGRAM_IDS');
 const billingExemptIds = (process.env.BILLING_EXEMPT_TELEGRAM_IDS ?? '')
   .split(',')
   .map((id) => id.trim())
@@ -41,6 +47,7 @@ if (billingExemptIds.some((id) => !/^[1-9]\d*$/.test(id)))
 if (!Number.isSafeInteger(starsPrice) || starsPrice < 1 || starsPrice > 10000)
   throw new Error('Invalid PUBLICATION_PRICE_STARS');
 export const env = {
+  OWNER_TELEGRAM_IDS: ownerIds,
   BILLING_EXEMPT_TELEGRAM_IDS: billingExemptIds,
   STARS_BILLING_ENABLED: process.env.STARS_BILLING_ENABLED === '1',
   PUBLICATION_PRICE_STARS: starsPrice,

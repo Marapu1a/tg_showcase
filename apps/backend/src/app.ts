@@ -4,6 +4,7 @@ import {
 } from './modules/billing/routes.js';
 import { startBillingWorker } from './modules/billing/worker.js';
 import Fastify from 'fastify';
+import { hubRoutes, ownerRoutes, isOwner } from './modules/owner/routes.js';
 import { registerAbuseLimits } from './plugins/abuse-limits.js';
 import { listingsRoutes, mediaRoutes } from './modules/listings/routes.js';
 import {
@@ -75,6 +76,10 @@ export function buildApp(options: { notifications?: boolean } = {}) {
         }),
     });
     sellerApp.register(billingRoutes, { prefix: '/billing' });
+    sellerApp.get('/owner-access', async (request) => ({
+      isOwner: isOwner(request.seller.telegramUserId),
+    }));
+    sellerApp.register(ownerRoutes, { prefix: '/admin' });
     sellerApp.register(listingsRoutes, { prefix: '/listings' });
     sellerApp.register(sellerOrdersRoutes, { prefix: '/orders' });
     sellerApp.register(channelsRoutes, { prefix: '/channels' });
@@ -83,6 +88,7 @@ export function buildApp(options: { notifications?: boolean } = {}) {
     sellerApp.register(offersRoutes, { prefix: '/offers' });
   });
   app.register(offerEventsRoutes);
+  app.register(hubRoutes);
   app.register(publicOrdersRoutes);
   app.register(mediaRoutes);
   app.register(channelHandoffRoutes);

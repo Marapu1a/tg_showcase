@@ -2,6 +2,30 @@ generator client {
   provider = "prisma-client-js"
 }
 
+model HubProject {
+  id String @id @default(cuid())
+  slug String @unique
+  name String
+  summary String
+  description String
+  telegramUrl String
+  status String @default("ACTIVE")
+  visible Boolean @default(false)
+  version Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model OwnerAudit {
+  id String @id @default(cuid())
+  telegramUserId String
+  action String
+  projectId String
+  details Json
+  createdAt DateTime @default(now())
+  @@index([createdAt])
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")

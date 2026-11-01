@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { requestJson, errorText } from '../api/client';
 
-export function useLiveQuery<T>(url: string, delay = 250) {
+export function useLiveQuery<T>(url: string, delay = 250, requiresAuth = true) {
   const [revision, setRevision] = useState(0);
   const [result, setResult] = useState<{
     url: string;
@@ -13,12 +13,16 @@ export function useLiveQuery<T>(url: string, delay = 250) {
     const controller = new AbortController();
     let active = true;
     const timer = setTimeout(() => {
-      void requestJson<T>(url, {
-        signal: AbortSignal.any([
-          controller.signal,
-          AbortSignal.timeout(25000),
-        ]),
-      })
+      void requestJson<T>(
+        url,
+        {
+          signal: AbortSignal.any([
+            controller.signal,
+            AbortSignal.timeout(25000),
+          ]),
+        },
+        requiresAuth,
+      )
         .then((data) => {
           if (active) setResult({ url, revision, data });
         })
@@ -31,7 +35,7 @@ export function useLiveQuery<T>(url: string, delay = 250) {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [url, revision, delay]);
+  }, [url, revision, delay, requiresAuth]);
   const current = result?.url === url && result.revision === revision;
   return {
     data: current ? result.data : undefined,

@@ -37,3 +37,6 @@ pnpm dev:miniapp
 pnpm build, pnpm lint, pnpm --filter @tg-showcase/backend test. Проверка с изолированной схемой PostgreSQL включается через RUN_DB_TESTS=1: [подробности](docs/ORDERS.md).
 
 Это версия для локальной проверки. Платёжных интеграций и биллинга нет. Направление монетизации — оплата за использование, конкретный тариф не выбран.
+
+
+TG Zoo: [публичный хаб и закрытая админка](docs/TG_ZOO_PLAN.md).

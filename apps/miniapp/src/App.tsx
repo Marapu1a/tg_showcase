@@ -1,4 +1,6 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Route, Routes } from 'react-router-dom';
+import { HubEntry, HubPage, HubProjectPage } from './pages/HubPage';
+import { OwnerPage } from './pages/OwnerPage';
 import { LegalPage } from './pages/LegalPage';
 
 import { AppLayout } from './components/AppLayout';
@@ -14,7 +16,10 @@ export function App() {
   return (
     <Routes>
       <Route element={<AppLayout />}>
-        <Route index element={<Navigate replace to="/dashboard" />} />
+        <Route index element={<HubEntry />} />
+        <Route path="/hub" element={<HubPage />} />
+        <Route path="/projects/:slug" element={<HubProjectPage />} />
+        <Route path="/admin" element={<OwnerPage />} />
         <Route path="/dashboard" element={<ChannelPage />} />
         <Route path="/products" element={<ProductsPage />} />
         <Route path="/orders" element={<OrdersPage />} />
